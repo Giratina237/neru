@@ -77,8 +77,8 @@ shared across machines, and the daemon warns once at load about the lines that
 mean nothing here. What each one does instead is in
 [Platform-specific options](#platform-specific-options).
 
-On Linux, "supported" means an X11 session or a Wayland session on wlroots or
-KWin. GNOME Wayland is not supported at all; the daemon exits at startup.
+On Linux, "supported" means an X11 session or a Wayland session on wlroots,
+KWin, COSMIC or GNOME (with Xwayland).
 
 ---
 
@@ -479,7 +479,7 @@ On Windows, put the executable path in the `bundle_id` field, and use a TOML lit
 
 > **Heads up:** Linux identity strings vary by toolkit and distribution. GTK, Qt, Electron, and XWayland apps often report a `WM_CLASS`/`app_id` you would not guess (e.g. `Google-chrome`, `code`, `org.kde.konsole`). Always confirm with the commands above rather than assuming a reverse-DNS name.
 
-**GNOME/Mutter on Wayland is not supported at all** — the daemon exits at startup rather than running without per-app support, partly because Mutter implements no focused-app protocol (no `wlr-foreign-toplevel-management`) for Neru to identify the focused window with. GNOME on **X11** works normally, as do all wlroots compositors and KWin/KDE on Wayland. See [CROSS_PLATFORM.md](./CROSS_PLATFORM.md) for the backend matrix.
+**GNOME/Mutter on Wayland identifies the focused window through the Neru GNOME Shell extension.** Mutter implements no focused-app protocol (no `wlr-foreign-toplevel-management`), so the daemon installs a small extension that reports it; until the first re-login loads it, `[apps]` entries never match and the global keymap applies everywhere. GNOME on **X11** identifies the focused window normally, as do all wlroots compositors, KWin/KDE and COSMIC on Wayland. See [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md#gnome-wayland).
 
 Where the compositor or X11 exposes a focus-change signal, Neru applies per-app overrides the instant you switch windows; otherwise it re-checks the focused app a few times per second.
 

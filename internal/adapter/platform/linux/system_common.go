@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/y3owk1n/neru/internal/adapter/platform/gnomeshell"
 	"github.com/y3owk1n/neru/internal/derrors"
 	"github.com/y3owk1n/neru/internal/domain/geometry"
 	"github.com/y3owk1n/neru/internal/ports"
@@ -27,6 +28,7 @@ const (
 	backendWaylandWlroots = "wayland-wlroots"
 	backendWaylandKDE     = "wayland-kde"
 	backendWaylandCOSMIC  = "wayland-cosmic"
+	backendWaylandGNOME   = "wayland-gnome"
 	// backendUnknown mirrors platform.LinuxBackend.String() for BackendUnknown.
 	// This package cannot import platform (the factory there imports this one),
 	// so the label is duplicated rather than referenced.
@@ -115,6 +117,14 @@ func (s *SystemAdapter) Capabilities() ports.PlatformCapabilities {
 
 			return err
 		})
+	// The watcher is built on the same focused-app source as Process, and on
+	// GNOME that source is the Neru GNOME Shell extension: a session it is
+	// not running in has a watcher that reports nothing, and doctor has to
+	// say so rather than promise per-app config.
+	if s.backend == backendWaylandGNOME {
+		capabilities.AppWatcher = gnomeAppWatcherCapability()
+	}
+
 	capabilities.Screen = s.probedCapability("screen enumeration", capabilities.Screen,
 		func() error {
 			_, err := s.ScreenBounds(context.Background())
@@ -216,6 +226,12 @@ func (s *SystemAdapter) LogDir() (string, error) {
 func (s *SystemAdapter) FocusedApplicationPID(ctx context.Context) (int, error) {
 	if s.backend == backendX11 {
 		return x11FocusedApplicationPID()
+	}
+
+	// GNOME shares the wlr client, but Mutter offers it no toplevel protocol;
+	// the Neru GNOME Shell extension is the source there.
+	if s.backend == backendWaylandGNOME {
+		return gnomeFocusedApplicationPID()
 	}
 
 	if s.waylandUsesWlrClientStack() {
@@ -536,6 +552,14 @@ func (s *SystemAdapter) SyncCursorPosition(ctx context.Context) error {
 	default:
 	}
 
+	// Mutter has no layer shell for the discovery surfaces, but the same
+	// trick works one floor down: an override-redirect window on Xwayland
+	// receives the pointer's entry with global coordinates, the way the
+	// overlay itself is drawn there.
+	if s.backend == backendWaylandGNOME {
+		return xwaylandRefreshCursorPosition(ctx)
+	}
+
 	if s.waylandUsesWlrClientStack() {
 		return waylandRefreshCursorPosition(ctx)
 	}
@@ -766,7 +790,7 @@ func (s *SystemAdapter) unavailableDetail(feature string, cause error) string {
 	}
 
 	return feature + " is not implemented on linux backend " + s.backend +
-		"; supported backends are x11, wayland-wlroots, wayland-kde and wayland-cosmic"
+		"; supported backends are x11, wayland-wlroots, wayland-kde, wayland-cosmic and wayland-gnome"
 }
 
 // backendLabel names the backend for diagnostics, including the undetected case.
@@ -886,9 +910,12 @@ func (s *SystemAdapter) currentCursorPosition() image.Point {
 	return point
 }
 
-// waylandUsesWlrClientStack is true when the session uses the same Wayland
-// client protocols as wlroots (layer shell, xdg-output, virtual pointer, etc.).
-// KDE Plasma's KWin implements these for third-party clients; GNOME does not.
+// waylandUsesWlrClientStack is true when the session is served by the shared
+// wlroots client: xdg-output for screens, the cursor cache, and whichever of
+// the input protocols the compositor offers. KDE Plasma's KWin and cosmic-comp
+// implement most of the family for third-party clients; Mutter implements
+// xdg-output alone, which is enough for the screens and the cache, and every
+// other capability GNOME has is a portal or Xwayland one.
 func (s *SystemAdapter) waylandUsesWlrClientStack() bool {
 	return backendUsesWlrClientStack(s.backend)
 }
@@ -898,15 +925,17 @@ func (s *SystemAdapter) waylandUsesWlrClientStack() bool {
 // so a future wlr-family backend is added in one place.
 func backendUsesWlrClientStack(backend string) bool {
 	return backend == backendWaylandWlroots || backend == backendWaylandKDE ||
-		backend == backendWaylandCOSMIC
+		backend == backendWaylandCOSMIC || backend == backendWaylandGNOME
 }
 
 // backendCapturesViaPortal names the wlr-client-stack backends whose compositor
 // advertises no screencopy protocol, so pixels come off the portal's ScreenCast
-// session behind a consent gate: KWin and cosmic-comp. Every consent check and
-// the smooth-cursor animator that cannot use a virtual pointer route on it.
+// session behind a consent gate: KWin, cosmic-comp and Mutter. Every consent
+// check and the smooth-cursor animator that cannot use a virtual pointer route
+// on it.
 func backendCapturesViaPortal(backend string) bool {
-	return backend == backendWaylandKDE || backend == backendWaylandCOSMIC
+	return backend == backendWaylandKDE || backend == backendWaylandCOSMIC ||
+		backend == backendWaylandGNOME
 }
 
 // Ensure SystemAdapter implements ports.SystemPort.
@@ -1121,3 +1150,24 @@ func darkModeCapability(value int, source darkModeSource, ok bool) ports.Feature
 
 // SystemAdapter posts single moves without waiting for the held-key glide.
 var _ ports.InstantCursorMover = (*SystemAdapter)(nil)
+
+// gnomeAppWatcherCapability reports the watcher as the extension's state: live
+// when the extension answers, a stub naming the fix when it does not.
+func gnomeAppWatcherCapability() ports.FeatureCapability {
+	bridge := gnomeshell.Shared(nil)
+	bridge.EnsureStarted()
+
+	_, _, err := bridge.Focused()
+	if err != nil {
+		return ports.FeatureCapability{
+			Status: ports.FeatureStatusStub,
+			Detail: "focused-app watcher needs the Neru GNOME Shell extension: " + err.Error() +
+				"; enable " + gnomeshell.UUID + " and log out and back in",
+		}
+	}
+
+	return ports.FeatureCapability{
+		Status: ports.FeatureStatusSupported,
+		Detail: "focused-app change detection keyed on the app_id the Neru GNOME Shell extension reports, event-driven",
+	}
+}

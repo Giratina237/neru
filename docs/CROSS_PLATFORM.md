@@ -107,7 +107,7 @@ bugs wearing a platform label, and it sees only what triage labelled.
 | **Build tag**        | `darwin`                    | `linux`                                  | `windows`                      |
 | **CGO**              | Required (Objective-C)      | Per-backend; most Linux backends need it | Not used (pure Go Win32 / COM) |
 | **Primary modifier** | `Cmd`                       | `Ctrl`                                   | `Ctrl`                         |
-| **Display stack**    | Cocoa / Quartz              | X11, or Wayland (wlroots / KWin / COSMIC) | Win32 / DWM                    |
+| **Display stack**    | Cocoa / Quartz              | X11, or Wayland (wlroots / KWin / COSMIC / Mutter) | Win32 / DWM           |
 | **Accessibility**    | AXUIElement                 | AT-SPI over D-Bus                        | UI Automation over COM         |
 | **Native product**   | Yes (`Neru.app`, codesigned)| Binary + install script                  | Binary                         |
 
@@ -126,17 +126,28 @@ read from the environment a second time.
 | `wayland-wlroots`      | Sway, Hyprland, niri, River, Wayfire, labwc, a `:wlroots` tag, or unset `XDG_CURRENT_DESKTOP` | Supported         |
 | `wayland-kde`          | `XDG_CURRENT_DESKTOP` contains `KDE`                                   | Supported         |
 | `wayland-cosmic`       | `XDG_CURRENT_DESKTOP` contains `COSMIC`                                | Supported         |
-| `wayland-gnome`        | `XDG_CURRENT_DESKTOP` contains `GNOME`                                 | **Not supported** |
+| `wayland-gnome`        | `XDG_CURRENT_DESKTOP` contains `GNOME`                                 | Supported with Xwayland |
 | `wayland-other`        | Any other Wayland compositor                                           | **Not supported** |
 | `unknown`              | Neither `WAYLAND_DISPLAY` nor `DISPLAY`                                | **Not supported** |
 
-> **GNOME Wayland does not run at all.** `platform.NewSystemPort` returns
-> `CodeNotSupported` for `wayland-gnome`, `wayland-other`, and `unknown`, and
-> that is the first step of daemon startup, so the daemon exits instead of
-> starting degraded. Mutter implements neither `wlr-layer-shell` (overlays) nor
-> `wlr-foreign-toplevel-management` (focused app), and exposes no
-> input-injection path Neru can use. **Use an X11 session under GNOME.** The
-> tables below have no GNOME column: nothing runs there.
+> **The daemon refuses to start on `wayland-other` and `unknown`.**
+> `platform.NewSystemPort` returns `CodeNotSupported` for both, and that is
+> the first step of daemon startup, so the daemon exits instead of starting
+> degraded. `wayland-gnome` is refused the same way when the session exposes no
+> X server (`DISPLAY` unset), because Mutter implements no `wlr-layer-shell`
+> and the overlay there is an override-redirect window on Xwayland.
+>
+> **GNOME reads as the KDE column below with four differences.** The overlay
+> is X11 + Cairo on Xwayland; focused-app identity, the app watcher and the
+> window origin come from the Neru GNOME Shell extension rather than a
+> compositor protocol (a stub until the extension is loaded, which takes one
+> re-login after the daemon installs it); the cursor position is re-learned
+> through an Xwayland discovery window rather than a layer-shell one; and
+> keyboard capture is the evdev proxy alone, with no compositor fallback.
+> Everything else, libei input, portal capture and consent, uinput scroll,
+> the dark-mode portal, is the KDE mechanism unchanged.
+> [LINUX_DESKTOPS.md](LINUX_DESKTOPS.md#gnome-wayland) carries the measured
+> detail.
 
 ---
 
@@ -700,6 +711,7 @@ chosen from the detected backend:
 | niri       | `niri msg -j focused-window` / `focused-output`              | Floating and fullscreen windows only. **Tiled** windows, including a maximized column, expose no on-screen position ([niri#2381](https://github.com/niri-wm/niri/issues/2381)), so hints are misaligned there. |
 | Sway       | `swaymsg -t get_tree`, focused node `rect` + `window_rect`   | none                                                                                                                       |
 | Hyprland   | `hyprctl -j activewindow` `at` / `size`                      | none                                                                                                                       |
+| GNOME      | GNOME Shell extension reporting the focused window's frame over D-Bus ([platform/gnomeshell](../internal/adapter/platform/gnomeshell)) | Reports on focus change and on the focused window moving, resizing or retitling. The daemon installs and enables the extension; the shell loads it at the next login. Identity is checked as on KDE. |
 | Anything else (X11, River, Wayfire) | none                                                | X11 needs none, AT-SPI already reports screen coordinates there. The rest report no origin, so hints stay window-relative. |
 
 Each source verifies the reported window size matches the AT-SPI frame (a
@@ -953,8 +965,9 @@ and [LINUX_SETUP.md](./LINUX_SETUP.md#install-time-environment-adjustments)
 carries it as install-time item 2.
 
 **Not Linux gaps**, and deliberately so: secure input detection and system
-cursor hide are [Platform Exclusives](#platform-exclusives); GNOME Wayland is
-a supported-desktop decision, not a capability; X11 modifier
+cursor hide are [Platform Exclusives](#platform-exclusives); GNOME Wayland
+needing a shell extension for its focused window is Mutter's decision, not a
+capability gap; X11 modifier
 passthrough is impossible for the display server (`XGrabKeyboard` is
 all-or-nothing and `XSendEvent` is ignored by most applications); and
 `neru services` on a non-systemd init is a stated boundary.
@@ -1377,14 +1390,18 @@ usually the mechanism:
   The routing is a runtime probe of the compositor, not a backend switch.
 - **Screen capture**: KDE and COSMIC read the portal's ScreenCast stream, and
   wlroots uses `zwlr_screencopy`.
-- **Overlay**: layer-shell works on KDE, wlroots, and COSMIC; only
-  GNOME/Mutter lacks it.
+- **Overlay**: layer-shell works on KDE, wlroots, and COSMIC. GNOME/Mutter
+  lacks it, and its overlay is the X11 backend unchanged, drawn on Xwayland.
+  An override-redirect window is the one surface Mutter stacks above every
+  toplevel without animating or focusing it.
 - **Genuinely DE-specific**: active-window geometry (KWin D-Bus vs Mutter
   D-Bus) and hotkey registration. These belong in DE-named files such as
   `internal/adapter/accessibility/atspi/kwin_origin.go`, or in a DE-named
   package when more than one subsystem needs the same fact:
   `internal/adapter/platform/kwin` holds the KWin geometry bridge because the
-  AT-SPI window origin and `FocusedWindowBounds` are two readings of it. What
+  AT-SPI window origin and `FocusedWindowBounds` are two readings of it, and
+  `internal/adapter/platform/gnomeshell` holds the GNOME Shell extension
+  bridge for the same two readers plus the app watcher. What
   is shared across compositors goes in a package named for the mechanism:
   `internal/adapter/platform/compositorcli` is how both callers ask niri, Sway
   and Hyprland their question.

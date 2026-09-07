@@ -9,8 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/godbus/dbus/v5"
+
 	"github.com/y3owk1n/neru/internal/adapter/platform/linux"
 	"github.com/y3owk1n/neru/internal/derrors"
+	"github.com/y3owk1n/neru/internal/ports"
 )
 
 // unimplementedBackend is a backend name no dispatch branch recognizes, so
@@ -24,6 +27,7 @@ const (
 	wlrootsBackend = "wayland-wlroots"
 	kdeBackend     = "wayland-kde"
 	cosmicBackend  = "wayland-cosmic"
+	gnomeBackend   = "wayland-gnome"
 )
 
 // stubCall names a SystemAdapter method and invokes it, discarding any
@@ -224,6 +228,7 @@ func TestSystemAdapter_CapabilitiesMatchBackendBehavior(t *testing.T) {
 		wlrootsBackend,
 		kdeBackend,
 		cosmicBackend,
+		gnomeBackend,
 	}
 
 	ctx := context.Background()
@@ -235,6 +240,14 @@ func TestSystemAdapter_CapabilitiesMatchBackendBehavior(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
+			// On GNOME the process capability is the extension bridge's live
+			// state, and the bridge connects off the request path, so a probe
+			// and a call milliseconds apart can straddle its first answer on
+			// a machine where the extension is running.
+			if backend == gnomeBackend {
+				skipWhenGNOMEExtensionIsLive(t)
+			}
+
 			adapter := linux.NewSystemAdapter(backend)
 			capabilities := adapter.Capabilities()
 
@@ -391,7 +404,7 @@ func TestSystemAdapter_FocusedWindowBoundsRefusesWithNoGeometrySource(t *testing
 // KWin script at construction so the first caller is not answered from a cold
 // cache; every other backend must leave $XDG_RUNTIME_DIR alone.
 func TestSystemAdapter_StartsNoCompositorBridgeOffKDE(t *testing.T) {
-	for _, backend := range []string{x11Backend, wlrootsBackend, cosmicBackend, unimplementedBackend} {
+	for _, backend := range []string{x11Backend, wlrootsBackend, cosmicBackend, gnomeBackend, unimplementedBackend} {
 		t.Run(backend, func(t *testing.T) {
 			runtimeDir := t.TempDir()
 			t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
@@ -443,5 +456,83 @@ func TestSystemAdapter_MoveCursorInstantlyReportsNotSupported(t *testing.T) {
 	if !derrors.IsNotSupported(err) {
 		t.Errorf("MoveCursorInstantly returned %v (code %q), want CodeNotSupported",
 			err, derrors.GetCode(err))
+	}
+}
+
+// TestSystemAdapter_FocusedApplicationPIDOnGNOMENamesTheMissingSource pins
+// that GNOME does not borrow the wlr client's "nothing focused" answer: that
+// sentence promises a PID once a window takes focus, and Mutter offers no
+// protocol that could ever deliver one.
+func TestSystemAdapter_FocusedApplicationPIDOnGNOMENamesTheMissingSource(t *testing.T) {
+	skipWhenGNOMEExtensionIsLive(t)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	adapter := linux.NewSystemAdapter(gnomeBackend)
+
+	_, err := adapter.FocusedApplicationPID(context.Background())
+	if !derrors.IsNotSupported(err) {
+		t.Fatalf("FocusedApplicationPID() error = %v, want CodeNotSupported", err)
+	}
+
+	if !strings.Contains(err.Error(), "GNOME Shell extension") {
+		t.Fatalf("FocusedApplicationPID() error = %q, want it to name the extension", err.Error())
+	}
+
+	if strings.Contains(err.Error(), "focused window") {
+		t.Fatalf(
+			"FocusedApplicationPID() error = %q, must not promise an answer once a window is focused",
+			err.Error(),
+		)
+	}
+}
+
+// TestSystemAdapter_AppWatcherIsAStubOnGNOMEWithoutTheExtension pins that the
+// capability matrix does not advertise a watcher that cannot fire: with the
+// shell extension not running, GNOME has no focused-app source, and doctor
+// must name the fix rather than promise per-app config.
+func TestSystemAdapter_AppWatcherIsAStubOnGNOMEWithoutTheExtension(t *testing.T) {
+	skipWhenGNOMEExtensionIsLive(t)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	capabilities := linux.NewSystemAdapter(gnomeBackend).Capabilities()
+
+	if capabilities.AppWatcher.Status != ports.FeatureStatusStub {
+		t.Fatalf(
+			"AppWatcher.Status = %q, want %q",
+			capabilities.AppWatcher.Status,
+			ports.FeatureStatusStub,
+		)
+	}
+
+	if !strings.Contains(capabilities.AppWatcher.Detail, "GNOME Shell extension") {
+		t.Fatalf(
+			"AppWatcher.Detail = %q, want it to name the extension",
+			capabilities.AppWatcher.Detail,
+		)
+	}
+}
+
+// skipWhenGNOMEExtensionIsLive skips a test that pins the answer for a
+// session without the Neru GNOME Shell extension, on the one kind of machine
+// where that answer is untrue: a GNOME session running it. The bridge is
+// process-wide and asks the real session bus, so the test cannot fake the
+// extension away.
+func skipWhenGNOMEExtensionIsLive(t *testing.T) {
+	t.Helper()
+
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return
+	}
+
+	defer func() { _ = conn.Close() }()
+
+	var hasOwner bool
+
+	err = conn.BusObject().
+		Call("org.freedesktop.DBus.NameHasOwner", 0, "org.neru.Shell").
+		Store(&hasOwner)
+	if err == nil && hasOwner {
+		t.Skip("the Neru GNOME Shell extension is running in this session")
 	}
 }
