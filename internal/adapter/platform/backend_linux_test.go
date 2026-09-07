@@ -96,6 +96,24 @@ func TestDetectLinuxBackendFromEnv(t *testing.T) {
 			want:           BackendWaylandGNOME,
 		},
 		{
+			name:           "wayland labwc desktop named without its tag",
+			currentDesktop: "labwc",
+			waylandDisplay: waylandDisplay,
+			want:           BackendWaylandWlroots,
+		},
+		{
+			name:           "wayland labwc desktop carries the wlroots tag",
+			currentDesktop: "labwc:wlroots",
+			waylandDisplay: waylandDisplay,
+			want:           BackendWaylandWlroots,
+		},
+		{
+			name:           "wayland desktop tagged wlroots without a known name",
+			currentDesktop: "someshell:wlroots",
+			waylandDisplay: waylandDisplay,
+			want:           BackendWaylandWlroots,
+		},
+		{
 			name:           "wayland kde desktop",
 			currentDesktop: desktopKDE,
 			waylandDisplay: waylandDisplay,
