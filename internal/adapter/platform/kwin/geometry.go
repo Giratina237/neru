@@ -57,6 +57,10 @@ const scriptFileName = "neru-kwin-geometry.js"
 // answers and only one of them should send a caller to the active screen.
 var errKWinAbsent = errors.New("org.kde.KWin is not on the session bus")
 
+// errBusClosed is the reason recorded when the bridge's connection went away
+// under it, until the reinstall it schedules says otherwise.
+var errBusClosed = errors.New("the session bus connection carrying the KWin bridge was closed")
+
 // errNoRuntimeDir and errRuntimeDirNotPrivate are the two ways a session can
 // fail to offer somewhere the geometry script may live. They are separate
 // because a user fixes them differently: the first is a session started outside
@@ -102,8 +106,16 @@ type Geometry struct {
 	// is set once and read from any goroutine.
 	logger atomic.Pointer[zap.Logger]
 
-	// watching is the restart watch's one-shot claim (restart_watch.go).
+	// watching is the restart watch's per-connection claim (restart_watch.go).
 	watching claim
+
+	// conn is the bridge's own session-bus connection, dialed by connection.
+	// Not the process-wide dbus.SessionBus(): closing that closes every
+	// signal channel subscribed on it, and the tray closes it when its loop
+	// ends, which ended the restart watch silently and left the exported
+	// receiver on a dead connection with the last window still cached.
+	// Guarded by startMu.
+	conn *dbus.Conn
 
 	startMu   sync.Mutex
 	starting  bool
@@ -450,7 +462,7 @@ func (g *Geometry) recordAttempt(generation uint64, err error) {
 // ahead of that check on purpose — watchKWin says why it is not the same kind
 // of act.
 func (g *Geometry) install() error {
-	conn, err := dbus.SessionBus()
+	conn, err := g.connection()
 	if err != nil {
 		return fmt.Errorf("session bus: %w", err)
 	}
@@ -482,6 +494,47 @@ func (g *Geometry) install() error {
 	}
 
 	return g.installScript(conn)
+}
+
+// connection returns the bridge's own bus connection, dialing one when there
+// is none or the last one was closed under it. The watcher that owned the old
+// one releases the restart watch's claim on its way out (connectionClosed),
+// and install re-arms the watch, the export and the name on the new one.
+func (g *Geometry) connection() (*dbus.Conn, error) {
+	g.startMu.Lock()
+	defer g.startMu.Unlock()
+
+	if g.conn != nil && g.conn.Connected() {
+		return g.conn, nil
+	}
+
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return nil, err
+	}
+
+	g.conn = conn
+
+	return conn, nil
+}
+
+// connectionClosed is how a watcher reports that its channel closed. It is
+// true only for the connection the bridge still holds: a watcher whose
+// connection was replaced while it was busy handing over an owner change must
+// not empty the successor's cache or schedule a third install. Its claim is
+// its own to release either way, and keyed by connection so releasing it
+// cannot touch the successor's.
+func (g *Geometry) connectionClosed(conn *dbus.Conn) bool {
+	g.startMu.Lock()
+	defer g.startMu.Unlock()
+
+	if g.conn != conn {
+		return false
+	}
+
+	g.conn = nil
+
+	return true
 }
 
 // installScript writes the KWin script to disk and loads + starts it.

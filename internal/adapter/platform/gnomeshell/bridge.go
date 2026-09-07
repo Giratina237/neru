@@ -82,7 +82,9 @@ type Bridge struct {
 	starting  bool
 	connected bool
 	warned    bool
-	watching  bool
+	// watched is the connection a serve loop is armed on, so a replacement
+	// connection gets its own loop even while the retired one winds down.
+	watched   *dbus.Conn
 	installed bool
 	// installHint is what the one install attempt did, kept so every later
 	// "absent" answer carries the next step, not only the attempt's own.
@@ -346,9 +348,25 @@ func (b *Bridge) connection() (*dbus.Conn, error) {
 	}
 
 	b.conn = conn
-	b.watching = false
 
 	return conn, nil
+}
+
+// connectionClosed is how a serve loop reports that its channel closed. It is
+// true only for the connection the bridge still holds: a loop whose connection
+// was replaced while it was busy must not reset its successor's state.
+func (b *Bridge) connectionClosed(conn *dbus.Conn) bool {
+	b.startMu.Lock()
+	defer b.startMu.Unlock()
+
+	if b.conn != conn {
+		return false
+	}
+
+	b.conn = nil
+	b.connected = false
+
+	return true
 }
 
 func nameHasOwner(conn *dbus.Conn, name string) (bool, error) {
@@ -368,8 +386,8 @@ func nameHasOwner(conn *dbus.Conn, name string) (bool, error) {
 // nothing is exported and nothing is written by it.
 func (b *Bridge) watch(conn *dbus.Conn) {
 	b.startMu.Lock()
-	already := b.watching
-	b.watching = true
+	already := b.watched == conn
+	b.watched = conn
 	b.startMu.Unlock()
 
 	if already {
@@ -396,14 +414,14 @@ func (b *Bridge) watch(conn *dbus.Conn) {
 	signals := make(chan *dbus.Signal, signalBuffer)
 	conn.Signal(signals)
 
-	go b.serve(signals)
+	go b.serve(conn, signals)
 }
 
 // serve runs as long as the connection does. Every signal is checked by shape
 // rather than trusted to the match rules. The channel closing means the
 // connection went away, and a cache with no stream behind it is the stale
 // answer this bridge exists to end, so the bridge reconnects.
-func (b *Bridge) serve(signals <-chan *dbus.Signal) {
+func (b *Bridge) serve(conn *dbus.Conn, signals <-chan *dbus.Signal) {
 	for signal := range signals {
 		switch signal.Name {
 		case changedSignal:
@@ -417,17 +435,22 @@ func (b *Bridge) serve(signals <-chan *dbus.Signal) {
 		}
 	}
 
+	b.startMu.Lock()
+	if b.watched == conn {
+		b.watched = nil
+	}
+	b.startMu.Unlock()
+
+	if !b.connectionClosed(conn) {
+		return
+	}
+
 	b.log().Debug("GNOME Shell bridge connection closed; reconnecting")
 
 	b.mu.Lock()
 	b.window, b.valid = Window{}, false
 	b.startErr = errNotConnected
 	b.mu.Unlock()
-
-	b.startMu.Lock()
-	b.connected = false
-	b.watching = false
-	b.startMu.Unlock()
 
 	b.EnsureStarted()
 }
