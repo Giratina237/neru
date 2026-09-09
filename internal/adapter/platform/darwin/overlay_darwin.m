@@ -1663,6 +1663,102 @@ static NeruTextLayout *NeruLayoutFromGlyphStarts(NSString *text, const CGFloat *
 		                      [offsets addObject:@(isnan(x) ? 0.0 : x - base)];
 	                      }];
 
+- (void)drawRadialDualGridLinesForCells:(NSArray<NSValue *> *)cellRectValues {
+	if ([cellRectValues count] == 0) {
+		return;
+	}
+
+	NSRect firstRect = [cellRectValues[0] rectValue];
+	CGFloat minX = NSMinX(firstRect), maxX = NSMaxX(firstRect);
+	CGFloat minY = NSMinY(firstRect), maxY = NSMaxY(firstRect);
+
+	for (NSValue *val in cellRectValues) {
+		NSRect r = [val rectValue];
+		if (NSMinX(r) < minX)
+			minX = NSMinX(r);
+		if (NSMinY(r) < minY)
+			minY = NSMinY(r);
+		if (NSMaxX(r) > maxX)
+			maxX = NSMaxX(r);
+		if (NSMaxY(r) > maxY)
+			maxY = NSMaxY(r);
+	}
+
+	CGFloat cx = (minX + maxX) / 2.0;
+	CGFloat cy = (minY + maxY) / 2.0;
+
+	NSMutableSet<NSNumber *> *xsSet = [NSMutableSet set];
+	NSMutableSet<NSNumber *> *ysSet = [NSMutableSet set];
+	for (NSValue *val in cellRectValues) {
+		NSRect r = [val rectValue];
+		[xsSet addObject:@(round(NSMinX(r)))];
+		[xsSet addObject:@(round(NSMaxX(r)))];
+		[ysSet addObject:@(round(NSMinY(r)))];
+		[ysSet addObject:@(round(NSMaxY(r)))];
+	}
+
+	NSArray<NSNumber *> *xs = [[xsSet allObjects] sortedArrayUsingSelector:@selector(compare:)];
+	NSArray<NSNumber *> *ys = [[ysSet allObjects] sortedArrayUsingSelector:@selector(compare:)];
+
+	CGFloat wPrim = self.gridBorderWidth > 0 ? self.gridBorderWidth : 1.0;
+	CGFloat wSec = self.gridSecondaryBorderWidth > 0 ? self.gridSecondaryBorderWidth : wPrim;
+
+	NSColor *primColor = self.gridBorderColor;
+	NSColor *secColor = self.gridSecondaryBorderColor;
+
+	// Vertical grid lines
+	for (NSNumber *xNum in xs) {
+		CGFloat x = [xNum doubleValue];
+		if (x == minX) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(minX, minY, wPrim, maxY - minY));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(minX + wPrim, minY, wSec, maxY - minY));
+		} else if (x == maxX) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(maxX - wPrim, minY, wPrim, maxY - minY));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(maxX - wPrim - wSec, minY, wSec, maxY - minY));
+		} else if (x <= cx) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(x - wPrim, minY, wPrim, maxY - minY));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(x, minY, wSec, maxY - minY));
+		} else {
+			[secColor setFill];
+			NSRectFill(NSMakeRect(x - wSec, minY, wSec, maxY - minY));
+			[primColor setFill];
+			NSRectFill(NSMakeRect(x, minY, wPrim, maxY - minY));
+		}
+	}
+
+	// Horizontal grid lines
+	for (NSNumber *yNum in ys) {
+		CGFloat y = [yNum doubleValue];
+		if (y == minY) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(minX, minY, maxX - minX, wPrim));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(minX, minY + wPrim, maxX - minX, wSec));
+		} else if (y == maxY) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(minX, maxY - wPrim, maxX - minX, wPrim));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(minX, maxY - wPrim - wSec, maxX - minX, wSec));
+		} else if (y <= cy) {
+			[primColor setFill];
+			NSRectFill(NSMakeRect(minX, y - wPrim, maxX - minX, wPrim));
+			[secColor setFill];
+			NSRectFill(NSMakeRect(minX, y, maxX - minX, wSec));
+		} else {
+			[secColor setFill];
+			NSRectFill(NSMakeRect(minX, y - wSec, maxX - minX, wSec));
+			[primColor setFill];
+			NSRectFill(NSMakeRect(minX, y, maxX - minX, wPrim));
+		}
+	}
+}
+
 	NeruTextLayout *layout = [[NeruTextLayout alloc] init];
 	layout.size = size;
 	layout.characters = characters;

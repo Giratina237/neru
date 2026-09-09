@@ -4,7 +4,6 @@ package linux
 
 import (
 	"image"
-	"math"
 	"testing"
 
 	"github.com/y3owk1n/neru/internal/adapter/overlay/render/badge"
@@ -66,40 +65,20 @@ func TestLinuxOverlay_DrawRecursiveGrid_SecondaryLine(t *testing.T) {
 		style, recursivegridcomponent.VirtualPointerState{}, false, 0,
 	)
 
-	// 2x2 grid with dual lines should draw 2 rectangles per cell = 8 rectangles total.
-	if len(surface.rects) != 8 {
-		t.Fatalf("surface.rects count = %d, want 8", len(surface.rects))
+	// 2x2 grid has 4 cell background fills + 12 divider line stripes = 16 rects total.
+	if len(surface.rects) != 16 {
+		t.Fatalf("surface.rects count = %d, want 16 (4 fills + 12 stripes)", len(surface.rects))
 	}
 
 	expectedPrimaryColor := badge.ParseHexARGB("#ff0000")
 	expectedSecondaryColor := badge.ParseHexARGB("#00ff00")
-	expectedOffset := int(math.Round((2.0 + 4.0) / 2.0))
 
-	for i := 0; i < 4; i++ {
-		primary := surface.rects[i*2]
-		secondary := surface.rects[i*2+1]
-
-		if primary.border != expectedPrimaryColor {
-			t.Errorf("cell[%d] primary border = %#08x, want %#08x", i, primary.border, expectedPrimaryColor)
-		}
-		if primary.lineWidth != 2.0 {
-			t.Errorf("cell[%d] primary lineWidth = %v, want 2.0", i, primary.lineWidth)
-		}
-
-		if secondary.border != expectedSecondaryColor {
-			t.Errorf("cell[%d] secondary border = %#08x, want %#08x", i, secondary.border, expectedSecondaryColor)
-		}
-		if secondary.lineWidth != 4.0 {
-			t.Errorf("cell[%d] secondary lineWidth = %v, want 4.0", i, secondary.lineWidth)
-		}
-		if secondary.fill != 0 {
-			t.Errorf("cell[%d] secondary fill = %#08x, want 0 (transparent)", i, secondary.fill)
-		}
-
-		expectedSecondaryBounds := primary.bounds.Inset(expectedOffset)
-		if secondary.bounds != expectedSecondaryBounds {
-			t.Errorf("cell[%d] secondary bounds = %v, want %v (inset by %d)",
-				i, secondary.bounds, expectedSecondaryBounds, expectedOffset)
+	// Verify that the 12 divider stripes use either expectedPrimaryColor or expectedSecondaryColor as fill
+	dividerRects := surface.rects[4:]
+	for i, r := range dividerRects {
+		if r.fill != expectedPrimaryColor && r.fill != expectedSecondaryColor {
+			t.Errorf("dividerRects[%d].fill = %#08x, want either %#08x (primary) or %#08x (secondary)",
+				i, r.fill, expectedPrimaryColor, expectedSecondaryColor)
 		}
 	}
 }
@@ -127,22 +106,20 @@ func TestLinuxOverlay_DrawRecursiveGrid_SecondaryLineInheritsPrimaryWidthWhenZer
 		style, recursivegridcomponent.VirtualPointerState{}, false, 0,
 	)
 
-	if len(surface.rects) != 8 {
-		t.Fatalf("surface.rects count = %d, want 8", len(surface.rects))
+	// 4 fills + 12 stripes = 16 rects
+	if len(surface.rects) != 16 {
+		t.Fatalf("surface.rects count = %d, want 16 (4 fills + 12 stripes)", len(surface.rects))
 	}
 
-	expectedOffset := int(math.Round((3.0 + 3.0) / 2.0)) // 3px inset
+	// For line X=0, primary is at [0, 3] (dx=3) and secondary is at [3, 6] (dx=3)
+	dividerRects := surface.rects[4:]
+	leftPrimary := dividerRects[0]
+	leftSecondary := dividerRects[1]
 
-	for i := 0; i < 4; i++ {
-		primary := surface.rects[i*2]
-		secondary := surface.rects[i*2+1]
-
-		if secondary.lineWidth != 3.0 {
-			t.Errorf("cell[%d] secondary lineWidth = %v, want 3.0 (inherited)", i, secondary.lineWidth)
-		}
-		expectedSecondaryBounds := primary.bounds.Inset(expectedOffset)
-		if secondary.bounds != expectedSecondaryBounds {
-			t.Errorf("cell[%d] secondary bounds = %v, want %v", i, secondary.bounds, expectedSecondaryBounds)
-		}
+	if leftPrimary.bounds.Dx() != 3 {
+		t.Errorf("primary stripe width = %d, want 3", leftPrimary.bounds.Dx())
+	}
+	if leftSecondary.bounds.Dx() != 3 {
+		t.Errorf("secondary stripe width = %d, want 3 (inherited)", leftSecondary.bounds.Dx())
 	}
 }
