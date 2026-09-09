@@ -489,6 +489,92 @@ func (qg *RecursiveGrid) ZoomToPoint(point image.Point, targetDepth int) (image.
 	return qg.CurrentCenter(), false
 }
 
+// boundsForDepth computes the bounding box corresponding to the given recursion depth,
+// centered around point and constrained to initialBounds.
+func (qg *RecursiveGrid) boundsForDepth(point image.Point, depth int) image.Rectangle {
+	if depth <= 0 {
+		return qg.initialBounds
+	}
+
+	w := qg.initialBounds.Dx()
+	h := qg.initialBounds.Dy()
+
+	for d := 0; d < depth; d++ {
+		layout := qg.LayoutForDepth(d)
+		if layout.GridCols > 0 {
+			w /= layout.GridCols
+		}
+
+		if layout.GridRows > 0 {
+			h /= layout.GridRows
+		}
+	}
+
+	w = max(w, qg.minSizeWidth)
+	h = max(h, qg.minSizeHeight)
+
+	halfW := divRound(w, CenterDivisor)
+	halfH := divRound(h, CenterDivisor)
+	minX := point.X - halfW
+	minY := point.Y - halfH
+	rect := image.Rect(minX, minY, minX+w, minY+h)
+
+	if rect.Dx() > qg.initialBounds.Dx() {
+		rect.Min.X = qg.initialBounds.Min.X
+		rect.Max.X = qg.initialBounds.Max.X
+	} else {
+		if rect.Min.X < qg.initialBounds.Min.X {
+			rect = rect.Add(image.Point{X: qg.initialBounds.Min.X - rect.Min.X, Y: 0})
+		}
+
+		if rect.Max.X > qg.initialBounds.Max.X {
+			rect = rect.Sub(image.Point{X: rect.Max.X - qg.initialBounds.Max.X, Y: 0})
+		}
+	}
+
+	if rect.Dy() > qg.initialBounds.Dy() {
+		rect.Min.Y = qg.initialBounds.Min.Y
+		rect.Max.Y = qg.initialBounds.Max.Y
+	} else {
+		if rect.Min.Y < qg.initialBounds.Min.Y {
+			rect = rect.Add(image.Point{X: 0, Y: qg.initialBounds.Min.Y - rect.Min.Y})
+		}
+
+		if rect.Max.Y > qg.initialBounds.Max.Y {
+			rect = rect.Sub(image.Point{X: 0, Y: rect.Max.Y - qg.initialBounds.Max.Y})
+		}
+	}
+
+	return rect
+}
+
+// ResetAroundPoint resets the grid to a subgrid of size corresponding to targetDepth
+// centered around the given point (in local coordinates). If targetDepth is 0,
+// it restores the full screen bounds. The point becomes the center of the new
+// bounds (clamped to initialBounds).
+func (qg *RecursiveGrid) ResetAroundPoint(point image.Point, targetDepth int) image.Point {
+	if targetDepth <= 0 {
+		qg.Reset()
+
+		return qg.CurrentCenter()
+	}
+
+	if targetDepth > qg.maxDepth {
+		targetDepth = qg.maxDepth
+	}
+
+	qg.history = make([]image.Rectangle, 0, targetDepth)
+	for d := 0; d < targetDepth; d++ {
+		qg.history = append(qg.history, qg.boundsForDepth(point, d))
+	}
+
+	qg.currentBounds = qg.boundsForDepth(point, targetDepth)
+	qg.depth = targetDepth
+	qg.clearFinalCell()
+
+	return qg.CurrentCenter()
+}
+
 // clearFinalCell drops any recorded final-cell selection.
 func (qg *RecursiveGrid) clearFinalCell() {
 	qg.finalCell = 0
