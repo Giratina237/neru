@@ -18,11 +18,13 @@ import (
 //
 // It keeps its own picture of the modifiers, counting only presses the proxy
 // withheld for it. A modifier that was already down when the session began —
-// the activation chord's — was forwarded, so the compositor owns its release,
-// and the mode never sees it: a hint label typed while Super is still coming
-// up is the label, not Super plus the label. That is also what re-arms sticky
-// detection cleanly: the session starts at a clean slate of its own and waits
-// only for the chord to finish coming up.
+// the activation chord's — was forwarded, so the compositor owns its release
+// and the mode never sees it as a sticky toggle. It still names chords while
+// it is down. The macOS tap reads it off every event's flags and the X11 tap
+// counts it from the keyboard state after the grab, so Alt held from the
+// activation chord and Space pressed again is Alt+Space on every platform.
+// Sticky detection arms once the chord has finished coming up, and the
+// session's own count starts at a clean slate.
 type evdevSession struct {
 	tap   *EventTap
 	proxy *evdevProxy
@@ -114,11 +116,15 @@ func (s *evdevSession) handleRepeat(code uint16, modifier string, forwarded bool
 	s.tap.dispatchKey(chord)
 }
 
-func (s *evdevSession) handleRelease(code uint16, modifier string, _ bool) {
+func (s *evdevSession) handleRelease(code uint16, modifier string, forwarded bool) {
 	if modifier != "" {
 		if s.forwardedModifiers[code] {
-			delete(s.forwardedModifiers, code)
-			s.armIfClear()
+			// The compositor sees the key up only when the last keyboard
+			// holding it lets go, which is the release the rule forwards.
+			if forwarded {
+				delete(s.forwardedModifiers, code)
+				s.armIfClear()
+			}
 
 			return
 		}
@@ -152,7 +158,12 @@ func (s *evdevSession) chordName(code uint16) string {
 		return ""
 	}
 
-	return keyvocab.NormalizeKey(s.state.modifiers.prefix() + key)
+	held := s.state.modifiers.linuxModifierState
+	for forwarded := range s.forwardedModifiers {
+		held.update(s.proxy.capture.modifierName(forwarded), true)
+	}
+
+	return keyvocab.NormalizeKey(held.prefix() + key)
 }
 
 func (s *evdevSession) dispatchStickyToggle(modifier string, isDown bool) {
