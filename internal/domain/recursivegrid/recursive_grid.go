@@ -269,19 +269,37 @@ func (qg *RecursiveGrid) SelectCell(cell Cell) (image.Point, bool) {
 
 	if !qg.CanDivide() {
 		if qg.maxDepthNudge {
+			cols := qg.GridCols()
+			rows := qg.GridRows()
+			if cols <= 0 || rows <= 0 {
+				return center, false
+			}
+
+			col := idx % cols
+			row := idx / cols
+
 			width := qg.currentBounds.Dx()
 			height := qg.currentBounds.Dy()
 
-			newMinX := center.X - divRound(width, CenterDivisor)
-			newMinY := center.Y - divRound(height, CenterDivisor)
-			newBounds := image.Rect(newMinX, newMinY, newMinX+width, newMinY+height)
+			dx := divRound((2*col-cols+1)*width, 2*cols)
+			dy := divRound((2*row-rows+1)*height, 2*rows)
+
+			oldCenter := qg.CurrentCenter()
+			newCenter := image.Point{X: oldCenter.X + dx, Y: oldCenter.Y + dy}
+
+			newBounds := image.Rect(
+				qg.currentBounds.Min.X+dx,
+				qg.currentBounds.Min.Y+dy,
+				qg.currentBounds.Max.X+dx,
+				qg.currentBounds.Max.Y+dy,
+			)
 
 			qg.history = append(qg.history, qg.currentBounds)
 			qg.depthHistory = append(qg.depthHistory, qg.depth)
 			qg.currentBounds = newBounds
 			qg.hasFinalCell = false
 
-			return center, false
+			return newCenter, false
 		}
 
 		qg.finalCell = cell
