@@ -281,6 +281,8 @@ typedef NS_ENUM(NSInteger, NeruItemKind) {
 @property(nonatomic, strong) NSColor *gridLabelBackgroundColor;        ///< Grid label badge background color
 @property(nonatomic, strong) NSColor *gridBorderColor;                 ///< Grid border color
 @property(nonatomic, assign) CGFloat gridBorderWidth;                  ///< Grid border width
+@property(nonatomic, strong) NSColor *gridSecondaryBorderColor;        ///< Grid secondary border color
+@property(nonatomic, assign) CGFloat gridSecondaryBorderWidth;         ///< Grid secondary border width
 @property(nonatomic, assign) BOOL gridDrawLabelBackground;             ///< Draw label badge background
 @property(nonatomic, assign) CGFloat gridLabelBackgroundPaddingX;      ///< Grid label badge horizontal padding
 @property(nonatomic, assign) CGFloat gridLabelBackgroundPaddingY;      ///< Grid label badge vertical padding
@@ -461,6 +463,8 @@ typedef NS_ENUM(NSInteger, NeruItemKind) {
 		                                             alpha:1.0] colorWithAlphaComponent:0.8];
 		_gridBorderColor = [NSColor colorWithWhite:0.7 alpha:1.0];
 		_gridBorderWidth = 1.0;
+		_gridSecondaryBorderColor = nil;
+		_gridSecondaryBorderWidth = 0.0;
 		_gridDrawLabelBackground = NO;
 		_gridLabelBackgroundPaddingX = -1.0;
 		_gridLabelBackgroundPaddingY = -1.0;
@@ -3280,6 +3284,8 @@ void NeruDrawGridCells(OverlayWindow window, GridCell *cells, int count, GridCel
 	NSString *matchedBorderHex = style.matchedBorderColor ? @(style.matchedBorderColor) : nil;
 	NSString *borderHex = style.borderColor ? @(style.borderColor) : nil;
 	int borderWidth = style.borderWidth;
+	NSString *secondaryBorderHex = style.secondaryBorderColor ? @(style.secondaryBorderColor) : nil;
+	int secondaryBorderWidth = style.secondaryBorderWidth;
 	BOOL drawLabelBackground = style.drawLabelBackground ? YES : NO;
 	CGFloat labelBackgroundPaddingX = style.labelBackgroundPaddingX;
 	CGFloat labelBackgroundPaddingY = style.labelBackgroundPaddingY;
@@ -3348,9 +3354,13 @@ void NeruDrawGridCells(OverlayWindow window, GridCell *cells, int count, GridCel
 			                                                                        defaultColor:[NSColor blueColor]];
 			controller.overlayView.gridBorderColor = [controller.overlayView colorFromHex:borderHex
 			                                                                 defaultColor:[NSColor grayColor]];
+			controller.overlayView.gridSecondaryBorderColor = [controller.overlayView colorFromHex:secondaryBorderHex
+			                                                                          defaultColor:nil];
 
 			// Apply geometry and layout properties
 			controller.overlayView.gridBorderWidth = borderWidth > 0 ? borderWidth : 1.0;
+			controller.overlayView.gridSecondaryBorderWidth =
+			    secondaryBorderWidth > 0 ? secondaryBorderWidth : (borderWidth > 0 ? borderWidth : 1.0);
 			controller.overlayView.gridDrawLabelBackground = drawLabelBackground;
 			controller.overlayView.gridLabelBackgroundPaddingX = labelBackgroundPaddingX;
 			controller.overlayView.gridLabelBackgroundPaddingY = labelBackgroundPaddingY;
@@ -3427,6 +3437,8 @@ void NeruAnimateRecursiveGridTransition(
 	NSString *matchedBorderHex = style.matchedBorderColor ? @(style.matchedBorderColor) : nil;
 	NSString *borderHex = style.borderColor ? @(style.borderColor) : nil;
 	int borderWidth = style.borderWidth;
+	NSString *secondaryBorderHex = style.secondaryBorderColor ? @(style.secondaryBorderColor) : nil;
+	int secondaryBorderWidth = style.secondaryBorderWidth;
 	BOOL drawLabelBackground = style.drawLabelBackground ? YES : NO;
 	CGFloat labelBackgroundPaddingX = style.labelBackgroundPaddingX;
 	CGFloat labelBackgroundPaddingY = style.labelBackgroundPaddingY;
@@ -3496,8 +3508,12 @@ void NeruAnimateRecursiveGridTransition(
 			                                                                        defaultColor:[NSColor blueColor]];
 			controller.overlayView.gridBorderColor = [controller.overlayView colorFromHex:borderHex
 			                                                                 defaultColor:[NSColor grayColor]];
+			controller.overlayView.gridSecondaryBorderColor = [controller.overlayView colorFromHex:secondaryBorderHex
+			                                                                          defaultColor:nil];
 
 			controller.overlayView.gridBorderWidth = borderWidth > 0 ? borderWidth : 1.0;
+			controller.overlayView.gridSecondaryBorderWidth =
+			    secondaryBorderWidth > 0 ? secondaryBorderWidth : (borderWidth > 0 ? borderWidth : 1.0);
 			controller.overlayView.gridDrawLabelBackground = drawLabelBackground;
 			controller.overlayView.gridLabelBackgroundPaddingX = labelBackgroundPaddingX;
 			controller.overlayView.gridLabelBackgroundPaddingY = labelBackgroundPaddingY;
