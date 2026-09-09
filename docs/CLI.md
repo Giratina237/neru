@@ -306,6 +306,7 @@ nothing.
 | `--label-direction` |  | value | `hints` | Hint label enumeration: normal (default, prefix-avoidance, prefers shorter labels) or reverse (spreads labels across the alphabet) |
 | `--split-word` |  | none | `hints` | Split detected text into word-level regions (requires vision strategy) |
 | `--zoom-to-depth` |  | value | `recursive_grid` | Auto-zoom to the given depth (a non-negative integer) in recursive-grid at the current cursor position |
+| `--max-depth-nudge` |  | none | `recursive_grid` | Keep recursive grid active at max depth and shift grid bounds to center on selected cells |
 | `--cursor-selection-mode` |  | value | `hints` · `grid` · `recursive_grid` | How the real cursor should behave during selection: follow or hold |
 
 <!-- END GENERATED MODE FLAGS -->

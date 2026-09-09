@@ -289,6 +289,8 @@ const (
 	DefaultRecursiveGridMinSizeHeight = 1
 	// DefaultRecursiveGridMaxDepth is the default maximum recursion depth.
 	DefaultRecursiveGridMaxDepth = 10
+	// DefaultRecursiveGridMaxDepthNudge is the default for whether grid nudges at max depth.
+	DefaultRecursiveGridMaxDepthNudge = false
 	// DefaultRecursiveGridMinGridCols is the minimum allowed grid columns.
 	DefaultRecursiveGridMinGridCols = 1
 	// DefaultRecursiveGridMinGridRows is the minimum allowed grid rows.
@@ -660,6 +662,7 @@ func defaultRecursiveGrid() RecursiveGridConfig {
 		MinSizeWidth:  DefaultRecursiveGridMinSizeWidth,
 		MinSizeHeight: DefaultRecursiveGridMinSizeHeight,
 		MaxDepth:      DefaultRecursiveGridMaxDepth,
+		MaxDepthNudge: DefaultRecursiveGridMaxDepthNudge,
 	}
 }
 

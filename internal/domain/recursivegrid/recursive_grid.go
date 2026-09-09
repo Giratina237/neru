@@ -65,6 +65,8 @@ type RecursiveGrid struct {
 	dims          domain.GridDimensions // Default shape at depths with no override
 	depthLayouts  map[int]DepthLayout   // Per-depth layout overrides (sparse)
 	history       []image.Rectangle     // Stack of previous bounds for backtracking
+	depthHistory  []int                 // Stack of previous depths for backtracking
+	maxDepthNudge bool                  // Whether to nudge grid at max depth instead of completing
 	// finalCell is the cell picked once the grid could no longer be divided.
 	// SelectCell leaves currentBounds untouched on that path so backtracking
 	// still restores the correct ancestor, which means the user's actual
@@ -115,6 +117,7 @@ func NewRecursiveGridWithLayers(
 		dims:          dims,
 		depthLayouts:  depthLayouts,
 		history:       make([]image.Rectangle, 0, maxDepth),
+		depthHistory:  make([]int, 0, maxDepth),
 	}
 }
 
@@ -265,6 +268,22 @@ func (qg *RecursiveGrid) SelectCell(cell Cell) (image.Point, bool) {
 	center := rectCenter(selected)
 
 	if !qg.CanDivide() {
+		if qg.maxDepthNudge {
+			width := qg.currentBounds.Dx()
+			height := qg.currentBounds.Dy()
+
+			newMinX := center.X - divRound(width, CenterDivisor)
+			newMinY := center.Y - divRound(height, CenterDivisor)
+			newBounds := image.Rect(newMinX, newMinY, newMinX+width, newMinY+height)
+
+			qg.history = append(qg.history, qg.currentBounds)
+			qg.depthHistory = append(qg.depthHistory, qg.depth)
+			qg.currentBounds = newBounds
+			qg.hasFinalCell = false
+
+			return center, false
+		}
+
 		qg.finalCell = cell
 		qg.hasFinalCell = true
 
@@ -273,6 +292,7 @@ func (qg *RecursiveGrid) SelectCell(cell Cell) (image.Point, bool) {
 
 	// Save current bounds for backtracking
 	qg.history = append(qg.history, qg.currentBounds)
+	qg.depthHistory = append(qg.depthHistory, qg.depth)
 	qg.currentBounds = selected
 	qg.depth++
 
@@ -360,7 +380,12 @@ func (qg *RecursiveGrid) Backtrack() bool {
 	lastIndex := len(qg.history) - 1
 	qg.currentBounds = qg.history[lastIndex]
 	qg.history = qg.history[:lastIndex]
-	qg.depth--
+	if len(qg.depthHistory) > lastIndex {
+		qg.depth = qg.depthHistory[lastIndex]
+		qg.depthHistory = qg.depthHistory[:lastIndex]
+	} else {
+		qg.depth--
+	}
 	qg.clearFinalCell()
 
 	return true
@@ -376,6 +401,7 @@ func (qg *RecursiveGrid) Reset() {
 	qg.currentBounds = qg.initialBounds
 	qg.depth = 0
 	qg.history = qg.history[:0]
+	qg.depthHistory = qg.depthHistory[:0]
 	qg.clearFinalCell()
 }
 
@@ -430,8 +456,13 @@ func divRound(numerator, denominator int) int {
 	return (numerator + denominator/2) / denominator
 }
 
-// IsComplete returns true if the grid cannot be divided further (min size or max depth).
+// IsComplete returns true if the grid cannot be divided further (min size or max depth)
+// and maxDepthNudge is not enabled.
 func (qg *RecursiveGrid) IsComplete() bool {
+	if qg.maxDepthNudge {
+		return false
+	}
+
 	return !qg.CanDivide()
 }
 
@@ -493,4 +524,14 @@ func (qg *RecursiveGrid) ZoomToPoint(point image.Point, targetDepth int) (image.
 func (qg *RecursiveGrid) clearFinalCell() {
 	qg.finalCell = 0
 	qg.hasFinalCell = false
+}
+
+// SetMaxDepthNudge sets whether the grid nudges at max depth rather than completing.
+func (qg *RecursiveGrid) SetMaxDepthNudge(enabled bool) {
+	qg.maxDepthNudge = enabled
+}
+
+// MaxDepthNudge reports whether the grid nudges at max depth rather than completing.
+func (qg *RecursiveGrid) MaxDepthNudge() bool {
+	return qg.maxDepthNudge
 }

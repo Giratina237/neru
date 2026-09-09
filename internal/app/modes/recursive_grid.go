@@ -76,6 +76,19 @@ func (h *handlerState) activateRecursiveGridModeWithAction(activation modecmd.Ac
 		cursorShouldFollow = resolveCursorFollowSelection(activation.CursorFollowSelection)
 	}
 
+	var maxDepthNudge bool
+	if isRefresh && activation.MaxDepthNudge == nil && h.recursiveGrid.Context != nil {
+		maxDepthNudge = h.recursiveGrid.Context.MaxDepthNudge()
+	} else if activation.MaxDepthNudge != nil {
+		maxDepthNudge = *activation.MaxDepthNudge
+	} else if h.config != nil {
+		maxDepthNudge = h.config.RecursiveGrid.MaxDepthNudge
+	}
+
+	if h.recursiveGrid.Manager != nil {
+		h.recursiveGrid.Manager.SetMaxDepthNudge(maxDepthNudge)
+	}
+
 	// Auto-zoom to depth if requested.
 	// This reads the cursor position *before* we potentially move it to
 	// the grid center below, so zoom uses the user's actual cursor location.
@@ -111,6 +124,7 @@ func (h *handlerState) activateRecursiveGridModeWithAction(activation modecmd.Ac
 			activation,
 			isRefresh,
 			cursorShouldFollow,
+			maxDepthNudge,
 		)
 	}
 
@@ -199,6 +213,9 @@ func (h *handlerState) initializeRecursiveGridManager(screenBounds image.Rectang
 		},
 		h.logger,
 	)
+	if h.config != nil && h.recursiveGrid.Manager != nil {
+		h.recursiveGrid.Manager.SetMaxDepthNudge(h.config.RecursiveGrid.MaxDepthNudge)
+	}
 }
 
 // handleRecursiveGridKey handles key processing for recursive-grid mode.
@@ -224,6 +241,7 @@ func (h *handlerState) handleRecursiveGridKey(key string) {
 		pendingAction := h.recursiveGrid.Context.PendingAction()
 		pendingModifier := h.recursiveGrid.Context.PendingModifier()
 		cursorFollowSelection := h.recursiveGrid.Context.CursorFollowSelection()
+		maxDepthNudge := h.recursiveGrid.Context.MaxDepthNudge()
 
 		if pendingAction == nil && !repeat && !cursorFollowSelection {
 			h.refreshRecursiveGridVirtualPointer()
@@ -243,6 +261,7 @@ func (h *handlerState) handleRecursiveGridKey(key string) {
 					Modifier:              pendingModifier,
 					Repeat:                &repeat,
 					CursorFollowSelection: &cursorFollowSelection,
+					MaxDepthNudge:         &maxDepthNudge,
 					// Zoom is not re-applied on repeat; OnExit stays nil to
 					// preserve the stored steps.
 				})
@@ -357,6 +376,7 @@ func applyRecursiveGridFlags(
 	activation modecmd.Activation,
 	isRefresh bool,
 	cursorShouldFollow bool,
+	maxDepthNudge bool,
 ) {
 	if isRefresh {
 		if activation.Action != nil {
@@ -379,6 +399,10 @@ func applyRecursiveGridFlags(
 			ctx.SetCursorFollowSelection(*activation.CursorFollowSelection)
 		}
 
+		if activation.MaxDepthNudge != nil {
+			ctx.SetMaxDepthNudge(*activation.MaxDepthNudge)
+		}
+
 		return
 	}
 
@@ -387,6 +411,7 @@ func applyRecursiveGridFlags(
 	ctx.SetPendingModifier(activation.Modifier)
 	ctx.SetRepeat(activation.Repeat != nil && *activation.Repeat)
 	ctx.SetCursorFollowSelection(cursorShouldFollow)
+	ctx.SetMaxDepthNudge(maxDepthNudge)
 }
 
 // selectRecursiveGridCenter marks the current grid's center as the selection

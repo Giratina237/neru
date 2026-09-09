@@ -1303,6 +1303,7 @@ Cursor behavior: `neru recursive_grid --cursor-selection-mode follow|hold` (see 
 | `min_size_width`  | int    | `1`           | Minimum cell width in pixels                                     |
 | `min_size_height` | int    | `1`           | Minimum cell height in pixels                                    |
 | `max_depth`       | int    | `10`          | Maximum recursion levels (1–20)                                  |
+| `max_depth_nudge` | bool   | `false`       | Keep grid active at max depth and center grid on selected cell   |
 | `layers`          | array  | `[]`          | Per-depth layout overrides (see below)                           |
 
 #### Layers

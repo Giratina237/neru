@@ -512,9 +512,10 @@ type RecursiveGridConfig struct {
 	Keys string          `json:"keys" toml:"keys"`
 	UI   RecursiveGridUI `json:"ui"   toml:"ui"`
 	// Behavior
-	MinSizeWidth  int `json:"minSizeWidth"  toml:"min_size_width"`  // Default: 1
-	MinSizeHeight int `json:"minSizeHeight" toml:"min_size_height"` // Default: 1
-	MaxDepth      int `json:"maxDepth"      toml:"max_depth"`       // Default: 10
+	MinSizeWidth  int  `json:"minSizeWidth"  toml:"min_size_width"`  // Default: 1
+	MinSizeHeight int  `json:"minSizeHeight" toml:"min_size_height"` // Default: 1
+	MaxDepth      int  `json:"maxDepth"      toml:"max_depth"`       // Default: 10
+	MaxDepthNudge bool `json:"maxDepthNudge" toml:"max_depth_nudge"`
 	// Per-depth overrides for grid dimensions and keys.
 	// Depths not listed here use the top-level GridCols/GridRows/Keys.
 	Layers []RecursiveGridLayerConfig `json:"layers" toml:"layers"`

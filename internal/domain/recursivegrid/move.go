@@ -12,6 +12,7 @@ import (
 type gridState struct {
 	currentBounds image.Rectangle
 	history       []image.Rectangle
+	depthHistory  []int
 	depth         int
 	finalCell     Cell
 	hasFinalCell  bool
@@ -23,6 +24,7 @@ func (qg *RecursiveGrid) snapshot() gridState {
 	return gridState{
 		currentBounds: qg.currentBounds,
 		history:       slices.Clone(qg.history),
+		depthHistory:  slices.Clone(qg.depthHistory),
 		depth:         qg.depth,
 		finalCell:     qg.finalCell,
 		hasFinalCell:  qg.hasFinalCell,
@@ -33,6 +35,7 @@ func (qg *RecursiveGrid) snapshot() gridState {
 func (qg *RecursiveGrid) restore(state gridState) {
 	qg.currentBounds = state.currentBounds
 	qg.history = state.history
+	qg.depthHistory = state.depthHistory
 	qg.depth = state.depth
 	qg.finalCell = state.finalCell
 	qg.hasFinalCell = state.hasFinalCell
