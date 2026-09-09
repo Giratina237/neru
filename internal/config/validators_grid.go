@@ -409,6 +409,7 @@ func (c *Config) ValidateRecursiveGrid() error {
 
 	err := validateColors([]colorField{
 		{c.RecursiveGrid.UI.LineColor, "recursive_grid.ui.line_color"},
+		{c.RecursiveGrid.UI.SecondaryLineColor, "recursive_grid.ui.secondary_line_color"},
 		{c.RecursiveGrid.UI.HighlightColor, "recursive_grid.ui.highlight_color"},
 		{c.RecursiveGrid.UI.TextColor, "recursive_grid.ui.text_color"},
 		{c.RecursiveGrid.UI.LabelBackgroundColor, "recursive_grid.ui.label_background_color"},
@@ -422,6 +423,13 @@ func (c *Config) ValidateRecursiveGrid() error {
 		return derrors.New(
 			derrors.CodeInvalidConfig,
 			"recursive_grid.ui.line_width must be non-negative",
+		)
+	}
+
+	if c.RecursiveGrid.UI.SecondaryLineWidth < 0 {
+		return derrors.New(
+			derrors.CodeInvalidConfig,
+			"recursive_grid.ui.secondary_line_width must be non-negative",
 		)
 	}
 

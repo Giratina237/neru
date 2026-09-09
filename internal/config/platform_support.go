@@ -302,6 +302,7 @@ func PlatformSupport() parity.Declaration {
 			"recursive_grid.grid_rows",
 			"recursive_grid.keys",
 			"recursive_grid.ui.line_width",
+			"recursive_grid.ui.secondary_line_width",
 			"recursive_grid.ui.font_size",
 			"recursive_grid.ui.font_family",
 			"recursive_grid.ui.label_background",
@@ -436,6 +437,7 @@ func PlatformSupport() parity.Declaration {
 			"grid.ui.border_color",
 
 			"recursive_grid.ui.line_color",
+			"recursive_grid.ui.secondary_line_color",
 			"recursive_grid.ui.highlight_color",
 			"recursive_grid.ui.text_color",
 			"recursive_grid.ui.label_background_color",

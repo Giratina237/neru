@@ -299,6 +299,8 @@ const (
 	DefaultRecursiveGridAnimationDurationMS = 50
 	// DefaultRecursiveGridLineWidth is the default line width for grid lines.
 	DefaultRecursiveGridLineWidth = 1
+	// DefaultRecursiveGridSecondaryLineWidth is the default secondary line width (0 = inherit line_width).
+	DefaultRecursiveGridSecondaryLineWidth = 0
 	// DefaultRecursiveGridFontSize is the default font size for cell labels.
 	DefaultRecursiveGridFontSize = 10
 	// DefaultVirtualPointerChar is the default character displayed by the virtual pointer.
@@ -638,6 +640,8 @@ func defaultRecursiveGrid() RecursiveGridConfig {
 		UI: RecursiveGridUI{
 			LineColor:                       Color{},
 			LineWidth:                       DefaultRecursiveGridLineWidth,
+			SecondaryLineColor:              Color{}, // empty: no secondary line by default
+			SecondaryLineWidth:              DefaultRecursiveGridSecondaryLineWidth,
 			HighlightColor:                  Color{},
 			TextColor:                       Color{},
 			FontSize:                        DefaultRecursiveGridFontSize,
