@@ -129,6 +129,62 @@ func TestSelectCellCompletion(t *testing.T) {
 	assert.Equal(t, expectedCenter2, center2, "Center should be at (19, 19)")
 }
 
+func TestSelectCell_MaxDepthNudge(t *testing.T) {
+	bounds := image.Rect(0, 0, 50, 50)
+	grid := recursivegrid.NewRecursiveGridWithLayers(
+		bounds,
+		25,
+		25,
+		10,
+		domain.GridDimensions{Rows: 2, Cols: 2},
+		nil,
+	)
+	grid.SetMaxDepthNudge(true)
+	assert.True(t, grid.MaxDepthNudge())
+
+	// Select top-left - bounds narrow to (0,0)-(25,25), depth 1
+	center, completed := grid.SelectCell(recursivegrid.TopLeft)
+	assert.False(t, completed)
+	assert.Equal(t, image.Point{X: 13, Y: 13}, center)
+	assert.Equal(t, image.Rect(0, 0, 25, 25), grid.CurrentBounds())
+	assert.Equal(t, 1, grid.CurrentDepth())
+
+	// Next selection is at final depth (cannot divide further because 25/2 < 25)
+	// With maxDepthNudge, instead of completing, the grid bounds shifts so that
+	// the center of the selected cell becomes the center of the grid.
+	center2, completed2 := grid.SelectCell(recursivegrid.BottomRight)
+	assert.False(t, completed2, "Should NOT complete when maxDepthNudge is enabled")
+	assert.Equal(t, image.Point{X: 19, Y: 19}, center2)
+	assert.Equal(t, 1, grid.CurrentDepth(), "Depth should remain at final depth")
+
+	// Current bounds should now be centered at center2 (19, 19) with size 25x25:
+	// newMinX = 19 - divRound(25, 2) = 19 - 13 = 6
+	// newMinY = 19 - divRound(25, 2) = 19 - 13 = 6
+	// newMaxX = 6 + 25 = 31, newMaxY = 6 + 25 = 31
+	expectedBounds := image.Rect(6, 6, 31, 31)
+	assert.Equal(t, expectedBounds, grid.CurrentBounds())
+	assert.Equal(t, center2, grid.CurrentCenter())
+
+	// Nudge again: select top-left of this new bounds
+	center3, completed3 := grid.SelectCell(recursivegrid.TopLeft)
+	assert.False(t, completed3, "Should continue nudging without completing")
+	assert.Equal(t, 1, grid.CurrentDepth())
+	assert.Equal(t, center3, grid.CurrentCenter())
+
+	// Backtrack restores previous bounds and depth
+	assert.True(t, grid.Backtrack())
+	assert.Equal(t, expectedBounds, grid.CurrentBounds())
+	assert.Equal(t, 1, grid.CurrentDepth())
+
+	assert.True(t, grid.Backtrack())
+	assert.Equal(t, image.Rect(0, 0, 25, 25), grid.CurrentBounds())
+	assert.Equal(t, 1, grid.CurrentDepth())
+
+	assert.True(t, grid.Backtrack())
+	assert.Equal(t, bounds, grid.CurrentBounds())
+	assert.Equal(t, 0, grid.CurrentDepth())
+}
+
 func TestCanDivide(t *testing.T) {
 	tests := []struct {
 		name     string

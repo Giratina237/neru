@@ -157,6 +157,56 @@ func TestManagerHandleInputBacktrack(t *testing.T) {
 	)
 }
 
+func TestManager_MaxDepthNudge(t *testing.T) {
+	bounds := image.Rect(0, 0, 100, 100)
+	logger := zap.NewNop()
+
+	var updatePoint image.Point
+	updateCount := 0
+	completeCount := 0
+
+	manager := recursivegrid.NewManagerWithLayers(
+		bounds,
+		"uijk",
+		50,
+		50,
+		10,
+		domain.GridDimensions{Rows: 2, Cols: 2},
+		nil, nil,
+		recursivegrid.SelectionCallbacks{
+			OnUpdate: func(pt image.Point) {
+				updateCount++
+				updatePoint = pt
+			},
+			OnComplete: func(_ image.Point) {
+				completeCount++
+			},
+		},
+		logger,
+	)
+	manager.SetMaxDepthNudge(true)
+	assert.True(t, manager.MaxDepthNudge())
+
+	// First key press: narrows down to cell (depth 1)
+	pt1, comp1 := manager.HandleInput("u")
+	assert.False(t, comp1)
+	assert.Equal(t, 1, updateCount)
+	assert.Equal(t, 0, completeCount)
+	assert.Equal(t, pt1, updatePoint)
+
+	// Second key press: at max depth (cell size 50x50, 50/2 < 50)
+	// With maxDepthNudge, OnComplete must NOT fire, OnUpdate MUST fire,
+	// and isComplete returned must be false.
+	pt2, comp2 := manager.HandleInput("k")
+	assert.False(t, comp2, "HandleInput should return false for completion when maxDepthNudge is enabled")
+	assert.Equal(t, 2, updateCount)
+	assert.Equal(t, 0, completeCount, "OnComplete should not be called")
+	assert.Equal(t, pt2, updatePoint)
+
+	// Manager should still not be complete
+	assert.False(t, manager.IsComplete())
+}
+
 func TestManagerHandleInputUnmappedKey(t *testing.T) {
 	bounds := image.Rect(0, 0, 100, 100)
 	logger := zap.NewNop()

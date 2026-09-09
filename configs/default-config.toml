@@ -251,6 +251,7 @@ keys = "rtyfghvbn"                          # Cell selection keys (must be grid_
 min_size_width = 1                          # Stop subdividing below this width (px)
 min_size_height = 1                         # Stop subdividing below this height (px)
 max_depth = 10                              # Maximum recursion levels (1–20)
+max_depth_nudge = false                     # Keep grid active at max depth and center grid on selected cell
 
 [recursive_grid.animation]
 enabled = true                              # Opt out from native depth transition animation on supported platforms
