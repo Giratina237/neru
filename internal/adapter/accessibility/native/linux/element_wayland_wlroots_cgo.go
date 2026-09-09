@@ -6,6 +6,7 @@ import (
 	"image"
 	"os"
 
+	eventtaplinux "github.com/y3owk1n/neru/internal/adapter/eventtap/linux"
 	"github.com/y3owk1n/neru/internal/adapter/platform"
 	"github.com/y3owk1n/neru/internal/adapter/platform/linux"
 	"github.com/y3owk1n/neru/internal/adapter/platform/mousestate"
@@ -93,19 +94,58 @@ func wlrootsButton(button action.MouseButton) int {
 	}
 }
 
+// liftPhysicalModifiers releases the modifiers the user's hand is on for the
+// length of a pointer action, so the action carries only the set it names.
+// This is the x11ClickButtonAtPoint rule applied to the one keyboard the
+// compositor reads here, the evdev proxy's (footnote 7 of
+// docs/CROSS_PLATFORM.md). The releases go out on uinput and the action on the
+// Wayland socket, and nothing orders the two, so a lift waits the fixed period
+// the uinput side always waits (waitForScrollDelivery). The returned restore
+// presses the lifted modifiers again once the compositor has processed the
+// action. WaylandSyncModifiers is the barrier for that.
+func liftPhysicalModifiers() func() {
+	lifted, err := eventtaplinux.LiftHeldModifiers()
+	if err != nil || !lifted {
+		return func() {}
+	}
+
+	waitForScrollDelivery()
+
+	return restorePhysicalModifiers
+}
+
+// restorePhysicalModifiers puts back the lifted modifiers once the compositor
+// has processed the action, or the release that ends a drag.
+func restorePhysicalModifiers() {
+	if !linux.WaylandSyncModifiers(modifierSyncTimeout) {
+		waitForScrollDelivery()
+	}
+
+	_ = eventtaplinux.RestoreLiftedModifiers()
+}
+
 func wlrootsMouseDownAtPoint(
 	point image.Point,
 	button action.MouseButton,
 	modifiers action.Modifiers,
 ) error {
+	// Lifted for the whole drag, as on X11: the release that ends the last
+	// held button restores. A press that fails restores here, since no
+	// release is coming for it.
+	restore := liftPhysicalModifiers()
+
 	err := wlrootsPressModifiers(modifiers)
 	if err != nil {
+		restore()
+
 		return err
 	}
 
 	err = linux.WaylandButtonEvent(point, wlrootsButton(button), true)
 	if err != nil {
 		_ = wlrootsReleaseModifiers(modifiers)
+
+		restore()
 
 		return err
 	}
@@ -115,6 +155,29 @@ func wlrootsMouseDownAtPoint(
 	return nil
 }
 
+// restoreAfterRelease puts the lifted modifiers back once the button just
+// released was the last one held, so a release of an unrelated button does
+// not re-modify a drag still in progress.
+func restoreAfterRelease(button action.MouseButton) {
+	globalWlrootsPointerState.Clear(button)
+	restoreUnlessOtherHeld(button)
+}
+
+// restoreUnlessOtherHeld puts the lifted modifiers back unless a button other
+// than this one is still held. A release that failed goes through here with
+// its button still recorded, so the idle cleanup can retry it: the modifiers
+// come back regardless, which is the documented bias, since the opposite
+// drops a modifier the user is still holding.
+func restoreUnlessOtherHeld(button action.MouseButton) {
+	for _, held := range globalWlrootsPointerState.HeldButtons() {
+		if held != button {
+			return
+		}
+	}
+
+	restorePhysicalModifiers()
+}
+
 func wlrootsMouseUpAtPoint(
 	point image.Point,
 	button action.MouseButton,
@@ -122,24 +185,52 @@ func wlrootsMouseUpAtPoint(
 ) error {
 	heldModifiers, hadMouseDown := globalWlrootsPointerState.DownModifiers(button)
 	if hadMouseDown {
-		modifiers = heldModifiers
-	} else {
-		err := wlrootsPressModifiers(modifiers)
-		if err != nil {
-			return err
-		}
+		return wlrootsReleaseHeldButton(point, button, heldModifiers)
+	}
+
+	// A release with no press behind it is its own pointer action, so it
+	// lifts and restores around itself the way a click does.
+	restore := liftPhysicalModifiers()
+	defer restore()
+
+	err := wlrootsPressModifiers(modifiers)
+	if err != nil {
+		return err
 	}
 
 	defer func() {
 		_ = wlrootsReleaseModifiers(modifiers)
 	}()
 
+	return linux.WaylandButtonEvent(point, wlrootsButton(button), false)
+}
+
+// wlrootsReleaseHeldButton ends a press this process recorded, letting go of
+// the modifiers it pressed. A failed release keeps the button recorded for the
+// idle cleanup to retry, naming only the modifiers whose release also failed:
+// the rest are up already, and a second release of a modifier Neru no longer
+// holds lets go of the user's own.
+func wlrootsReleaseHeldButton(
+	point image.Point,
+	button action.MouseButton,
+	modifiers action.Modifiers,
+) error {
 	err := linux.WaylandButtonEvent(point, wlrootsButton(button), false)
 	if err != nil {
+		remaining, _ := releaseWaylandModifiersRemaining(modifiers)
+
+		if position, ok := globalWlrootsPointerState.DownPosition(button); ok {
+			globalWlrootsPointerState.SetDown(button, position, remaining)
+		}
+
+		restoreUnlessOtherHeld(button)
+
 		return err
 	}
 
-	globalWlrootsPointerState.Clear(button)
+	_ = wlrootsReleaseModifiers(modifiers)
+
+	restoreAfterRelease(button)
 
 	return nil
 }
@@ -151,6 +242,9 @@ func wlrootsClickButtonAtPoint(
 	button int,
 ) error {
 	original := wlrootsCurrentCursorPosition()
+
+	restore := liftPhysicalModifiers()
+	defer restore()
 
 	err := wlrootsPressModifiers(modifiers)
 	if err != nil {
@@ -195,14 +289,18 @@ func wlrootsMouseUp(button action.MouseButton) error {
 
 	err := linux.WaylandButtonRelease(wlrootsButton(button))
 	if err != nil {
+		if hadMouseDown {
+			restoreUnlessOtherHeld(button)
+		}
+
 		return err
 	}
 
 	if hadMouseDown {
 		_ = wlrootsReleaseModifiers(modifiers)
-	}
 
-	globalWlrootsPointerState.Clear(button)
+		restoreAfterRelease(button)
+	}
 
 	return nil
 }
