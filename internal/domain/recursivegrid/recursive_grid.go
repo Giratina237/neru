@@ -517,35 +517,7 @@ func (qg *RecursiveGrid) boundsForDepth(point image.Point, depth int) image.Rect
 	halfH := divRound(h, CenterDivisor)
 	minX := point.X - halfW
 	minY := point.Y - halfH
-	rect := image.Rect(minX, minY, minX+w, minY+h)
-
-	if rect.Dx() > qg.initialBounds.Dx() {
-		rect.Min.X = qg.initialBounds.Min.X
-		rect.Max.X = qg.initialBounds.Max.X
-	} else {
-		if rect.Min.X < qg.initialBounds.Min.X {
-			rect = rect.Add(image.Point{X: qg.initialBounds.Min.X - rect.Min.X, Y: 0})
-		}
-
-		if rect.Max.X > qg.initialBounds.Max.X {
-			rect = rect.Sub(image.Point{X: rect.Max.X - qg.initialBounds.Max.X, Y: 0})
-		}
-	}
-
-	if rect.Dy() > qg.initialBounds.Dy() {
-		rect.Min.Y = qg.initialBounds.Min.Y
-		rect.Max.Y = qg.initialBounds.Max.Y
-	} else {
-		if rect.Min.Y < qg.initialBounds.Min.Y {
-			rect = rect.Add(image.Point{X: 0, Y: qg.initialBounds.Min.Y - rect.Min.Y})
-		}
-
-		if rect.Max.Y > qg.initialBounds.Max.Y {
-			rect = rect.Sub(image.Point{X: 0, Y: rect.Max.Y - qg.initialBounds.Max.Y})
-		}
-	}
-
-	return rect
+	return image.Rect(minX, minY, minX+w, minY+h)
 }
 
 // ResetAroundPoint resets the grid to a subgrid of size corresponding to targetDepth

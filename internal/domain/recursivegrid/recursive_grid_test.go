@@ -1084,11 +1084,13 @@ func TestResetAroundPoint(t *testing.T) {
 	assert.Equal(t, 0, grid.CurrentDepth())
 	assert.Equal(t, bounds, grid.CurrentBounds())
 
-	// Clamping near top-left edge: point at (10, 10)
-	grid.ResetAroundPoint(image.Point{X: 10, Y: 10}, 1)
-	clampedBounds := grid.CurrentBounds()
-	assert.Equal(t, 0, clampedBounds.Min.X)
-	assert.Equal(t, 0, clampedBounds.Min.Y)
-	assert.Equal(t, 640, clampedBounds.Dx())
-	assert.Equal(t, 360, clampedBounds.Dy())
+	// Near top-left edge: point at (10, 10) centers the subgrid directly at (10, 10)
+	// allowing it to extend off-screen so the center does not drift away from the cursor.
+	centerEdge := grid.ResetAroundPoint(image.Point{X: 10, Y: 10}, 1)
+	assert.Equal(t, image.Point{X: 10, Y: 10}, centerEdge)
+	edgeBounds := grid.CurrentBounds()
+	assert.Equal(t, 10-320, edgeBounds.Min.X)
+	assert.Equal(t, 10-180, edgeBounds.Min.Y)
+	assert.Equal(t, 640, edgeBounds.Dx())
+	assert.Equal(t, 360, edgeBounds.Dy())
 }
