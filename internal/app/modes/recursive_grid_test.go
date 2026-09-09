@@ -340,7 +340,6 @@ func TestApplyRecursiveGridFlags_TellsAbsentOnExitFromEmptyOne(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestActivateRecursiveGridMode_ZoomAroundCursor(t *testing.T) {
 	t.Parallel()
 

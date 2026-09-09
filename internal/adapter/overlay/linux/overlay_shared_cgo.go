@@ -1259,7 +1259,6 @@ func (o *sharedOverlay) drawFrame(
 			style.ShowSubKeyPreviewIn(cell, nextDims) {
 			o.drawSubKeyMiniGrid(cell, nextKeyRunes, nextDims, style)
 		}
-		}
 	}
 
 	if virtualPointer.Visible {
