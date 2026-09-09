@@ -185,6 +185,65 @@ func TestSelectCell_MaxDepthNudge(t *testing.T) {
 	assert.Equal(t, 0, grid.CurrentDepth())
 }
 
+func TestSelectCell_MaxDepthNudge_NoDrift(t *testing.T) {
+	// A 5x5 grid with odd width and height (43x43).
+	// Remainder pixel distribution in ComputeGridCells must not bleed into
+	// drift when repeatedly pressing a cell along a cardinal axis.
+	bounds := image.Rect(100, 100, 143, 143)
+	grid := recursivegrid.NewRecursiveGridWithLayers(
+		bounds,
+		43, 43, 0, // maxDepth 0 so it's immediately at max depth
+		domain.GridDimensions{Rows: 5, Cols: 5},
+		nil,
+	)
+	grid.SetMaxDepthNudge(true)
+
+	initialCenter := grid.CurrentCenter()
+
+	// In a 5x5 grid:
+	// row 0: cells 0..4
+	// row 1: cells 5..9
+	// row 2 (middle row): cells 10..14
+	// row 3: cells 15..19
+	// row 4: cells 20..24
+	// Middle row, far right is cell 14 (row 2, col 4).
+	// Repeatedly selecting cell 14 must move right with ZERO vertical drift.
+	for i := range 10 {
+		center, completed := grid.SelectCell(14)
+		assert.False(t, completed)
+		assert.Equal(t, initialCenter.Y, center.Y, "Y coordinate must have 0 vertical drift on iteration %d", i)
+		assert.Equal(t, initialCenter.Y, grid.CurrentCenter().Y)
+	}
+
+	// Now press the opposite cell: middle row, far left is cell 10 (row 2, col 0).
+	// Pressing it 10 times must return exactly to the initial position with zero drift.
+	for range 10 {
+		center, completed := grid.SelectCell(10)
+		assert.False(t, completed)
+		assert.Equal(t, initialCenter.Y, center.Y)
+	}
+	assert.Equal(t, initialCenter, grid.CurrentCenter(), "10 right then 10 left must return to initial center")
+	assert.Equal(t, bounds, grid.CurrentBounds(), "10 right then 10 left must return to initial bounds")
+
+	// Middle column, bottom-most cell is cell 22 (row 4, col 2).
+	// Repeatedly selecting cell 22 must move down with ZERO horizontal drift.
+	for i := range 10 {
+		center, completed := grid.SelectCell(22)
+		assert.False(t, completed)
+		assert.Equal(t, initialCenter.X, center.X, "X coordinate must have 0 horizontal drift on iteration %d", i)
+		assert.Equal(t, initialCenter.X, grid.CurrentCenter().X)
+	}
+
+	// Dead center cell is cell 12 (row 2, col 2).
+	// Selecting dead center must not move the bounds or center at all.
+	currentBounds := grid.CurrentBounds()
+	centerPt := grid.CurrentCenter()
+	c, completed := grid.SelectCell(12)
+	assert.False(t, completed)
+	assert.Equal(t, centerPt, c)
+	assert.Equal(t, currentBounds, grid.CurrentBounds())
+}
+
 func TestCanDivide(t *testing.T) {
 	tests := []struct {
 		name     string
