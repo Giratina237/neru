@@ -355,3 +355,13 @@ func (m *Manager) keyToCell(key string) Cell {
 
 	return -1
 }
+
+// SetMaxDepthNudge sets whether the grid nudges at max depth rather than completing.
+func (m *Manager) SetMaxDepthNudge(enabled bool) {
+	m.grid.SetMaxDepthNudge(enabled)
+}
+
+// MaxDepthNudge reports whether the grid nudges at max depth rather than completing.
+func (m *Manager) MaxDepthNudge() bool {
+	return m.grid.MaxDepthNudge()
+}
