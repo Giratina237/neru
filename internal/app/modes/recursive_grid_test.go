@@ -330,6 +330,7 @@ func TestApplyRecursiveGridFlags_TellsAbsentOnExitFromEmptyOne(t *testing.T) {
 				modecmd.Activation{OnExit: testCase.onExit},
 				testCase.isRefresh,
 				true,
+				false,
 			)
 
 			if len(ctx.OnExit()) != testCase.want {
@@ -339,6 +340,7 @@ func TestApplyRecursiveGridFlags_TellsAbsentOnExitFromEmptyOne(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestActivateRecursiveGridMode_ZoomAroundCursor(t *testing.T) {
 	t.Parallel()
 
@@ -589,5 +591,28 @@ func TestActivateRecursiveGridMode_ZoomAroundCursor_Refresh(t *testing.T) {
 
 	if movedCursorTo != (image.Point{X: 600, Y: 700}) {
 		t.Fatalf("moved cursor to %v, want (600, 700)", movedCursorTo)
+	}
+}
+
+func TestApplyRecursiveGridFlags_MaxDepthNudge(t *testing.T) {
+	t.Parallel()
+
+	ctx := &componentrecursivegrid.Context{}
+	applyRecursiveGridFlags(ctx, modecmd.Activation{}, false, true, true)
+	if !ctx.MaxDepthNudge() {
+		t.Error("expected MaxDepthNudge to be true")
+	}
+
+	// Refresh without override should keep it
+	applyRecursiveGridFlags(ctx, modecmd.Activation{}, true, true, false)
+	if !ctx.MaxDepthNudge() {
+		t.Error("expected MaxDepthNudge to remain true across refresh")
+	}
+
+	// Refresh with override to false
+	off := false
+	applyRecursiveGridFlags(ctx, modecmd.Activation{MaxDepthNudge: &off}, true, true, false)
+	if ctx.MaxDepthNudge() {
+		t.Error("expected MaxDepthNudge to be overridden to false")
 	}
 }

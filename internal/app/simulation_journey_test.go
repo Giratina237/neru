@@ -500,6 +500,95 @@ func TestSimulation_RecursiveGridZoomsWithoutShowingAgain(t *testing.T) {
 	}
 }
 
+// TestSimulation_RecursiveGrid_MaxDepthNudge verifies that when max_depth_nudge is enabled,
+// selecting a cell at max depth shifts grid bounds to center on the selected cell
+// without completing or exiting recursive grid mode.
+func TestSimulation_RecursiveGrid_MaxDepthNudge(t *testing.T) {
+	cfg := simConfig()
+	cfg.RecursiveGrid.MaxDepth = 1
+	cfg.RecursiveGrid.MaxDepthNudge = true
+
+	sim := newSimHarness(t, cfg, nil)
+
+	sim.pressHotkey(recursiveGridHotkey)
+	sim.waitMode(domain.ModeRecursiveGrid)
+	sim.waitFor("recursive grid drawn", func() bool {
+		_, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok
+	})
+
+	initialBounds, _ := sim.overlay.lastRecursiveGridBounds()
+
+	// Press 'r' (top-left cell at depth 0) -> narrows to top-left cell, reaching depth 1 (max depth)
+	sim.press("r")
+	sim.waitFor("reached max depth", func() bool {
+		bounds, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok && bounds != initialBounds
+	})
+
+	maxDepthBounds, _ := sim.overlay.lastRecursiveGridBounds()
+
+	// Now at max depth: pressing another key ('r') would normally complete selection and exit mode.
+	// With maxDepthNudge, the mode must remain active, and bounds must shift to center on 'r'.
+	sim.press("r")
+	sim.waitFor("nudged at max depth", func() bool {
+		bounds, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok && bounds != maxDepthBounds
+	})
+
+	if got := sim.app.CurrentMode(); got != domain.ModeRecursiveGrid {
+		t.Fatalf("current mode = %v, want ModeRecursiveGrid after nudge at max depth", got)
+	}
+
+	// Press Escape to cleanly exit
+	sim.press("Escape")
+	sim.waitMode(domain.ModeIdle)
+}
+
+// TestSimulation_RecursiveGrid_MaxDepthNudge_Flag verifies that activating
+// recursive grid with --max-depth-nudge enables nudging even if config has it disabled.
+func TestSimulation_RecursiveGrid_MaxDepthNudge_Flag(t *testing.T) {
+	cfg := simConfig()
+	cfg.RecursiveGrid.MaxDepth = 1
+	cfg.RecursiveGrid.MaxDepthNudge = false
+
+	cfg.Hotkeys.Bindings[recursiveGridHotkey] = []string{"recursive_grid --max-depth-nudge"}
+
+	sim := newSimHarness(t, cfg, nil)
+
+	sim.pressHotkey(recursiveGridHotkey)
+	sim.waitMode(domain.ModeRecursiveGrid)
+	sim.waitFor("recursive grid drawn", func() bool {
+		_, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok
+	})
+
+	initialBounds, _ := sim.overlay.lastRecursiveGridBounds()
+
+	// Press 'r' -> reaches max depth
+	sim.press("r")
+	sim.waitFor("reached max depth", func() bool {
+		bounds, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok && bounds != initialBounds
+	})
+
+	maxDepthBounds, _ := sim.overlay.lastRecursiveGridBounds()
+
+	// Press 'r' at max depth -> nudges because flag enabled it
+	sim.press("r")
+	sim.waitFor("nudged at max depth", func() bool {
+		bounds, ok := sim.overlay.lastRecursiveGridBounds()
+		return ok && bounds != maxDepthBounds
+	})
+
+	if got := sim.app.CurrentMode(); got != domain.ModeRecursiveGrid {
+		t.Fatalf("current mode = %v, want ModeRecursiveGrid after nudge at max depth", got)
+	}
+
+	sim.press("Escape")
+	sim.waitMode(domain.ModeIdle)
+}
+
 // TestSimulation_ScrollJourney covers scroll mode: j scrolls, Escape leaves
 // the mode and lands back in idle.
 func TestSimulation_ScrollJourney(t *testing.T) {

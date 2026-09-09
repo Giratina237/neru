@@ -319,6 +319,7 @@ func PlatformSupport() parity.Declaration {
 			"recursive_grid.min_size_width",
 			"recursive_grid.min_size_height",
 			"recursive_grid.max_depth",
+			"recursive_grid.max_depth_nudge",
 			"recursive_grid.layers",
 			"recursive_grid.layers.depth",
 			"recursive_grid.layers.grid_cols",

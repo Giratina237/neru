@@ -64,6 +64,9 @@ type Activation struct {
 	// ZoomAroundCursor auto-drills recursive grid to a depth centered around the cursor.
 	ZoomAroundCursor *int
 
+	// MaxDepthNudge keeps recursive grid active at max depth, centering grid bounds on selected cells.
+	MaxDepthNudge *bool
+
 	// FilterRoles keeps only the elements with these accessibility roles.
 	FilterRoles []string
 
