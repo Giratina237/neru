@@ -63,6 +63,10 @@ const (
 	// FlagZoomToDepth auto-zooms recursive grid to a depth.
 	FlagZoomToDepth Flag = "zoom-to-depth"
 
+	// FlagMaxDepthNudge keeps recursive grid active at max depth and shifts the
+	// grid bounds to center on selected cells.
+	FlagMaxDepthNudge Flag = "max-depth-nudge"
+
 	// FlagCursorSelectionMode chooses how the real cursor behaves during
 	// selection.
 	FlagCursorSelectionMode Flag = "cursor-selection-mode"
@@ -121,6 +125,7 @@ const (
 	usageLabelDirection      = "Label order: normal (shorter labels first) or reverse (spread across the alphabet)"
 	usageSplitWord           = "Hint each word of detected text separately. Needs the vision strategy"
 	usageZoomToDepth         = "Open recursive grid already zoomed to this depth at the cursor"
+	usageMaxDepthNudge       = "Keep recursive grid active at max depth and shift grid bounds to center on selected cells"
 )
 
 // usageCycle is what a comma-separated list means on the flags that cycle.
@@ -589,6 +594,12 @@ var descriptors = []Descriptor{
 			}
 
 			return []string{FlagZoomToDepth.Assign(strconv.Itoa(*activation.ZoomToDepth))}
+		},
+	),
+	presenceFlag(FlagMaxDepthNudge, "", usageMaxDepthNudge, recursiveGridOnly,
+		func(activation *Activation) { activation.MaxDepthNudge = enabled() },
+		func(activation Activation) []string {
+			return renderPresence(FlagMaxDepthNudge, activation.MaxDepthNudge)
 		},
 	),
 	valueFlag(FlagCursorSelectionMode, "", usageCursorSelectionMode, msgCursorSelectionModeValue,
