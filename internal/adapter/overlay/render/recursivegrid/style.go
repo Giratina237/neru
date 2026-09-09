@@ -16,6 +16,8 @@ const (
 type Style struct {
 	lineColor                       string
 	lineWidth                       int
+	secondaryLineColor              string
+	secondaryLineWidth              int
 	highlightColor                  string
 	textColor                       string
 	fontSize                        int
@@ -39,6 +41,7 @@ type Style struct {
 	// parsing the hex on every read would put the conversion on the keypress
 	// path.
 	lineColorARGB              uint32
+	secondaryLineColorARGB     uint32
 	highlightColorARGB         uint32
 	textColorARGB              uint32
 	labelBackgroundColorARGB   uint32
@@ -54,6 +57,8 @@ type Style struct {
 type StyleOptions struct {
 	LineColor                       string
 	LineWidth                       int
+	SecondaryLineColor              string
+	SecondaryLineWidth              int
 	HighlightColor                  string
 	TextColor                       string
 	FontSize                        int
@@ -78,6 +83,8 @@ func NewStyle(opts StyleOptions) Style {
 	return Style{
 		lineColor:                       opts.LineColor,
 		lineWidth:                       opts.LineWidth,
+		secondaryLineColor:              opts.SecondaryLineColor,
+		secondaryLineWidth:              opts.SecondaryLineWidth,
 		highlightColor:                  opts.HighlightColor,
 		textColor:                       opts.TextColor,
 		fontSize:                        opts.FontSize,
@@ -106,6 +113,34 @@ func (s Style) LineColor() string {
 // LineWidth returns the configured cell border width.
 func (s Style) LineWidth() int {
 	return s.lineWidth
+}
+
+// SecondaryLineColor returns the secondary cell border color as a hex string.
+func (s Style) SecondaryLineColor() string {
+	return s.secondaryLineColor
+}
+
+// SecondaryLineWidth returns the secondary cell border width.
+// If <= 0 and secondaryLineColor is set, it defaults to LineWidth.
+func (s Style) SecondaryLineWidth() int {
+	if s.secondaryLineWidth > 0 {
+		return s.secondaryLineWidth
+	}
+
+	return s.lineWidth
+}
+
+// SecondaryLineWidthF returns the secondary cell border width as a float, clamped so a hairline stays visible.
+func (s Style) SecondaryLineWidthF() float64 {
+	return float64(max(s.SecondaryLineWidth(), minLineWidth))
+}
+
+// SecondaryLineColorARGB returns the secondary cell border color as packed ARGB.
+func (s Style) SecondaryLineColorARGB() uint32 { return s.secondaryLineColorARGB }
+
+// HasSecondaryLine reports whether a secondary cell border line is configured and visible.
+func (s Style) HasSecondaryLine() bool {
+	return s.secondaryLineColor != "" && s.SecondaryLineWidthF() > 0
 }
 
 // HighlightColor returns the active-cell highlight as a hex string.
@@ -228,6 +263,12 @@ func BuildStyle(cfg config.RecursiveGridConfig, theme config.ThemeProvider) Styl
 			config.RecursiveGridLineColorDark,
 		),
 		lineWidth: cfg.UI.LineWidth,
+		secondaryLineColor: cfg.UI.SecondaryLineColor.ForTheme(
+			theme,
+			"",
+			"",
+		),
+		secondaryLineWidth: cfg.UI.SecondaryLineWidth,
 		highlightColor: cfg.UI.HighlightColor.ForTheme(
 			theme,
 			config.RecursiveGridHighlightColorLight,
@@ -306,6 +347,9 @@ func (s Style) ShowLabels() bool { return true }
 // disagree with its hex ones.
 func (s Style) packColors() Style {
 	s.lineColorARGB = badge.ParseHexARGB(s.lineColor)
+	if s.secondaryLineColor != "" {
+		s.secondaryLineColorARGB = badge.ParseHexARGB(s.secondaryLineColor)
+	}
 	s.highlightColorARGB = badge.ParseHexARGB(s.highlightColor)
 	s.textColorARGB = badge.ParseHexARGB(s.textColor)
 	s.labelBackgroundColorARGB = badge.ParseHexARGB(s.labelBackgroundColor)

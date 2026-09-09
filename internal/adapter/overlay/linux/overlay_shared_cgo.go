@@ -4,6 +4,7 @@ package linux
 
 import (
 	"image"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -1211,6 +1212,19 @@ func (o *sharedOverlay) drawFrame(
 		}
 
 		o.drawRect(cell, fill, style.LineColorARGB(), style.LineWidthF())
+
+		if style.HasSecondaryLine() {
+			w1 := style.LineWidthF()
+			w2 := style.SecondaryLineWidthF()
+			offset := int(math.Round((w1 + w2) / 2.0))
+			if offset < 1 {
+				offset = 1
+			}
+			innerCell := cell.Inset(offset)
+			if innerCell.Dx() > 0 && innerCell.Dy() > 0 {
+				o.drawRect(innerCell, 0, style.SecondaryLineColorARGB(), w2)
+			}
+		}
 
 		if idx < len(keyRunes) {
 			label := style.LabelChar()
