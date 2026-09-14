@@ -170,7 +170,7 @@ answer.
 | **App watcher (focus change)**| ✅ NSWorkspace observer  | ✅ event-driven        | ✅ event-driven              | ✅ event-driven         | ✅ `SetWinEventHook`         |
 | **Keymap learns the focused app** | ✅ published by the watcher | ✅ published by the watcher | ✅ published by the watcher | ✅ published by the watcher | ✅ published by the watcher |
 | **Cursor position**           | ✅ `CGEventGetLocation`  | ✅ `XQueryPointer`     | ✅ `hyprctl` on Hyprland, else sync-surface cache | ✅ sync-surface cache | ✅ `GetCursorPos` |
-| **Cursor move**               | ✅ `CGEventPost` ([`postMouseMoveLocked`](../internal/adapter/platform/darwin/accessibility_mouse_darwin.m)) | ✅ XTest (`XTestFakeMotionEvent`) | ✅ `zwlr_virtual_pointer` | ✅ libei                | ✅ `SetCursorPos`            |
+| **Cursor move**               | ✅ `CGEventPost` ([`postMouseMoveLocked`](../internal/adapter/platform/darwin/accessibility_mouse_darwin.m)) | ✅ XTest (`XTestFakeMotionEvent`) | ✅ `zwlr_virtual_pointer` | ✅ libei                | ✅ `SetCursorPos`, glided while a button is held |
 | **Mouse buttons / drag**      | ✅ `CGEventPost`         | ✅ XTest ⁷             | ✅ `zwlr_virtual_pointer` ⁷  | ✅ libei ⁷              | ✅ `SendInput` ⁷             |
 | **Scroll injection**          | ✅ both axes             | ✅ both axes ⁷         | ✅ both axes (uinput, virtual-pointer fallback) | ✅ both axes (uinput, libei fallback) | ✅ both axes ⁷               |
 | **Modified scroll (`--modifier`)** | ✅ `CGEventSetFlags` on every chunk | ✅ XTest key hold ⁷ | ✅ virtual keyboard + virtual pointer (uinput on Hyprland ⁹) | ✅ libei | ✅ `SendInput` key hold ⁷ |
@@ -399,10 +399,16 @@ but Hyprland (footnote ⁹). A path with no backend to press through answers
 **Held mouse buttons.** Press and release are separate actions, so every
 backend keeps a [`mousestate.Tracker`](../internal/adapter/platform/mousestate/tracker.go)
 recording which buttons are down, where, and with which modifiers. Toggle
-actions resolve against it, `EnsureMouseUp` releases every held button when
-Neru returns to idle, and on macOS it selects the drag event type for cursor
-moves, which Quartz requires; the other platforms warp the pointer and let the
-compositor infer the drag.
+actions resolve against it, and `EnsureMouseUp` releases every held button when
+Neru returns to idle. On macOS it selects the drag event type for cursor moves,
+which Quartz requires. On Windows an application reads a drag only out of
+intermediate motion: a press, one jump and a release select nothing, whichever
+primitive makes the jump. A warp while a button is held is therefore spread
+over a short glide of `SetCursorPos` steps, each followed by an injected
+`MOUSEEVENTF_MOVE` at the same pixel because Windows moves the pointer for
+`SetCursorPos` during a held drag without redrawing it, and the release of a
+held button waits a few milliseconds after its last motion so the application
+processes the move before the button-up. The Linux backends warp the pointer and let the compositor infer the drag.
 
 ---
 
@@ -573,6 +579,7 @@ important thing to know before touching overlay code:
 | **Click-through**     | `setIgnoresMouseEvents:YES`              | XFixes empty input region              | empty `wl_surface` input region                  | `WS_EX_TRANSPARENT` + `HTTRANSPARENT`  |
 | **Always on top**     | `NSScreenSaverWindowLevel`               | `_NET_WM_STATE_ABOVE` + `MapRaised`    | overlay layer                                    | `HWND_TOPMOST`                     |
 | **Focus prevention**  | non-activating panel                     | `override_redirect=YES`                | controlled keyboard interactivity                | `WS_EX_NOACTIVATE`                 |
+| **Window identity**   | panel title `neru-overlay`               | `WM_CLASS` and name `neru-overlay`     | layer-shell namespace `neru-overlay`             | window class `neru-overlay`        |
 | **HiDPI**             | dynamic `contentsScale` + backing-change callback | `Xft.dpi`, one global factor  | `wl_output` scale + `wp_fractional_scale_v1` / `wp_viewporter` | per-monitor-v2 DPI aware, `GetDpiForMonitor` per window multiplies fonts, padding, lines and radii |
 | **Multi-monitor**     | per-display clamping, screen-change tracking | all monitors enumerated, per-monitor render, live RandR hotplug | one `wl_surface` per output (max 16), live hotplug | cursor-screen tracking, live `WM_DISPLAYCHANGE` hotplug, one panel window per display for monitor_select |
 | **Buffers**           | layer-backed, OS-managed                 | single Cairo surface                   | triple-buffered SHM pool                         | canvas bitmap + 2-buffer flip swapchain; one persistent DIB on the fallback |
@@ -580,6 +587,12 @@ important thing to know before touching overlay code:
 | **Text**              | NSFontManager                            | Cairo `select_font_face` / `show_text` | Cairo `select_font_face` / `show_text`           | DirectWrite text formats, cached per family and size; cached GDI fonts + `DrawTextW` on the fallback |
 | **Coordinate origin** | bottom-left (Y-flipped in the adapter)   | top-left                               | top-left                                         | top-left                           |
 | **Thread model**      | main-thread dispatch                     | `renderMu` mutex                       | `renderMu` mutex (also guards `wl_display`)      | dedicated UI thread (`LockOSThread`); draws queue and return, the thread presents |
+
+Grid cell sizes are planned in apparent units on every platform. macOS and
+Wayland report logical screen bounds already. X11 and Windows report physical
+pixels, so the planner multiplies its cell-size range by the same factor the
+overlay scales fonts with (`SystemPort.ScreenScale`), and
+`recursive_grid.min_size_width` / `min_size_height` are read the same way.
 
 ### Animation
 
