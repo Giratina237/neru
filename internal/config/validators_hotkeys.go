@@ -52,6 +52,7 @@ func (c *Config) ValidateHotkeys() error {
 		{ModeNameHints, c.Hints.Hotkeys},
 		{ModeNameGrid, c.Grid.Hotkeys},
 		{ModeNameRecursiveGrid, c.RecursiveGrid.Hotkeys},
+		{ModeNameBisect, c.Bisect.Hotkeys},
 		{ModeNameScroll, c.Scroll.Hotkeys},
 		// monitor_select binds keys like the other modes and dispatches them
 		// through the same executor, so its table is checked like theirs.
@@ -126,6 +127,7 @@ func (c *Config) checkHotkeysConflicts() error {
 		{ModeNameHints, c.Hints.Hotkeys},
 		{ModeNameGrid, c.Grid.Hotkeys},
 		{ModeNameRecursiveGrid, c.RecursiveGrid.Hotkeys},
+		{ModeNameBisect, c.Bisect.Hotkeys},
 		{ModeNameScroll, c.Scroll.Hotkeys},
 	}, len(c.Modes))
 
@@ -180,6 +182,20 @@ func (c *Config) checkHotkeysConflicts() error {
 				appConfig.BundleID,
 			),
 			c.HotkeysForModeAndApp(ModeNameScroll, appConfig.BundleID),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	for idx, appConfig := range c.Bisect.AppConfigs {
+		err := checkHotkeyConflicts(
+			fmt.Sprintf(
+				"bisect.hotkeys merged with bisect.app_configs[%d] (%s)",
+				idx,
+				appConfig.BundleID,
+			),
+			c.HotkeysForModeAndApp(ModeNameBisect, appConfig.BundleID),
 		)
 		if err != nil {
 			return err

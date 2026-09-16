@@ -647,57 +647,33 @@ func (m *Manager) DrawRecursiveGrid(
 	style recursivegrid.Style,
 	virtualPointer recursivegrid.VirtualPointerState,
 ) error {
-	m.cancelBackendAnimation()
-
-	m.renderMu.Lock()
-	defer m.renderMu.Unlock()
-
-	animEnabled := false
-
-	animDurationMS := 50
-
-	if m.RecursiveGridOverlay() != nil {
-		animCfg := m.RecursiveGridOverlay().Config().Animation
-		animEnabled = animCfg.Enabled
-		animDurationMS = animCfg.DurationMS
-	}
-
-	if m.x11 != nil {
-		m.x11.DrawRecursiveGridWithSubKeyPreview(
-			bounds,
-			depth,
-			keys,
-			dims,
-			nextKeys,
-			nextDims,
-			style,
-			virtualPointer,
-			animEnabled,
-			animDurationMS,
-		)
-
-		return nil
-	} else if m.wlroots != nil {
-		m.wlroots.DrawRecursiveGridWithSubKeyPreview(
-			bounds,
-			depth,
-			keys,
-			dims,
-			nextKeys,
-			nextDims,
-			style,
-			virtualPointer,
-			animEnabled,
-			animDurationMS,
-		)
-
-		return nil
-	}
-
-	return derrors.New(
-		derrors.CodeNotSupported,
-		"recursive grid overlay not implemented on linux backend",
+	return m.drawRegionGrid(
+		m.RecursiveGridOverlay(),
+		"recursive grid",
+		bounds, depth, keys, dims, nextKeys, nextDims, style, virtualPointer,
 	)
+}
+
+// DrawBisect draws the bisect region divided in four, with the transition
+// [bisect.animation] configures on the component built for it.
+func (m *Manager) DrawBisect(
+	bounds image.Rectangle,
+	depth int,
+	keys string,
+	style recursivegrid.Style,
+	virtualPointer recursivegrid.VirtualPointerState,
+) error {
+	return m.drawRegionGrid(
+		m.BisectOverlay(),
+		"bisect",
+		bounds, depth, keys, bisectDimensions(), "", domain.GridDimensions{}, style, virtualPointer,
+	)
+}
+
+// bisectDimensions is the one shape a bisect region is drawn in: four
+// quadrants.
+func bisectDimensions() domain.GridDimensions {
+	return domain.GridDimensions{Rows: 2, Cols: 2} //nolint:mnd // four quadrants
 }
 
 // DrawGridPointer puts grid mode's pointer stand-in on the shared surface.
@@ -1172,6 +1148,74 @@ func (m *Manager) HideIndicator(indicator ports.Indicator) {
 	case ports.VirtualPointerIndicator:
 		// Returned above.
 	}
+}
+
+// drawRegionGrid paints one region divided into cells on the shared surface,
+// reading the transition settings from the render component that owns the
+// mode being drawn. what names the mode for the refusal.
+func (m *Manager) drawRegionGrid(
+	component *recursivegrid.Overlay,
+	what string,
+	bounds image.Rectangle,
+	depth int,
+	keys string,
+	dims domain.GridDimensions,
+	nextKeys string,
+	nextDims domain.GridDimensions,
+	style recursivegrid.Style,
+	virtualPointer recursivegrid.VirtualPointerState,
+) error {
+	m.cancelBackendAnimation()
+
+	m.renderMu.Lock()
+	defer m.renderMu.Unlock()
+
+	animEnabled := false
+
+	animDurationMS := 50
+
+	if component != nil {
+		animCfg := component.Config().Animation
+		animEnabled = animCfg.Enabled
+		animDurationMS = animCfg.DurationMS
+	}
+
+	if m.x11 != nil {
+		m.x11.DrawRecursiveGridWithSubKeyPreview(
+			bounds,
+			depth,
+			keys,
+			dims,
+			nextKeys,
+			nextDims,
+			style,
+			virtualPointer,
+			animEnabled,
+			animDurationMS,
+		)
+
+		return nil
+	} else if m.wlroots != nil {
+		m.wlroots.DrawRecursiveGridWithSubKeyPreview(
+			bounds,
+			depth,
+			keys,
+			dims,
+			nextKeys,
+			nextDims,
+			style,
+			virtualPointer,
+			animEnabled,
+			animDurationMS,
+		)
+
+		return nil
+	}
+
+	return derrors.New(
+		derrors.CodeNotSupported,
+		what+" overlay not implemented on linux backend",
+	)
 }
 
 // cancelBackendAnimation stops any animation the attached backend is running,

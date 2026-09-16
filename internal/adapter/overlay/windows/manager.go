@@ -808,37 +808,33 @@ func (m *Manager) DrawRecursiveGrid(
 	style recursivegrid.Style,
 	virtualPointer recursivegrid.VirtualPointerState,
 ) error {
-	m.renderMu.Lock()
-	defer m.renderMu.Unlock()
-
-	m.ensureWinOverlayLocked()
-
-	if m.win == nil {
-		return derrors.New(
-			derrors.CodeNotSupported,
-			"recursive grid overlay not implemented on windows backend",
-		)
-	}
-
-	var (
-		animEnabled  bool
-		animDuration time.Duration
-	)
-
-	if m.RecursiveGridOverlay() != nil {
-		animCfg := m.RecursiveGridOverlay().Config().Animation
-		animEnabled = animCfg.Enabled
-		animDuration = time.Duration(animCfg.DurationMS) * time.Millisecond
-	}
-
-	// Shared activation may draw before the resize; enforce monitor bounds here.
-	m.win.Resize()
-	m.win.DrawRecursiveGrid(
+	return m.drawRegionGrid(
+		m.RecursiveGridOverlay(),
+		"recursive grid",
 		bounds, depth, keys, dims, nextKeys, nextDims, style, virtualPointer,
-		animEnabled, animDuration,
 	)
+}
 
-	return nil
+// DrawBisect draws the bisect region divided in four, with the transition
+// bisect.animation configures on the component built for it.
+func (m *Manager) DrawBisect(
+	bounds image.Rectangle,
+	depth int,
+	keys string,
+	style recursivegrid.Style,
+	virtualPointer recursivegrid.VirtualPointerState,
+) error {
+	return m.drawRegionGrid(
+		m.BisectOverlay(),
+		"bisect",
+		bounds, depth, keys, bisectDimensions(), "", domain.GridDimensions{}, style, virtualPointer,
+	)
+}
+
+// bisectDimensions is the one shape a bisect region is drawn in: four
+// quadrants.
+func bisectDimensions() domain.GridDimensions {
+	return domain.GridDimensions{Rows: 2, Cols: 2} //nolint:mnd // four quadrants
 }
 
 // UpdateGridMatches updates prefix highlighting for the grid overlay.
@@ -945,6 +941,54 @@ func (m *Manager) Flush() {
 // SetKeyboardCaptureEnabled is a no-op on Windows; the low-level keyboard hook
 // manages capture directly and has no scroll-passthrough toggle.
 func (m *Manager) SetKeyboardCaptureEnabled(_ bool) {}
+
+// drawRegionGrid paints one region divided into cells on the overlay window,
+// reading the transition settings from the render component that owns the
+// mode being drawn. what names the mode for the refusal.
+func (m *Manager) drawRegionGrid(
+	component *recursivegrid.Overlay,
+	what string,
+	bounds image.Rectangle,
+	depth int,
+	keys string,
+	dims domain.GridDimensions,
+	nextKeys string,
+	nextDims domain.GridDimensions,
+	style recursivegrid.Style,
+	virtualPointer recursivegrid.VirtualPointerState,
+) error {
+	m.renderMu.Lock()
+	defer m.renderMu.Unlock()
+
+	m.ensureWinOverlayLocked()
+
+	if m.win == nil {
+		return derrors.New(
+			derrors.CodeNotSupported,
+			what+" overlay not implemented on windows backend",
+		)
+	}
+
+	var (
+		animEnabled  bool
+		animDuration time.Duration
+	)
+
+	if component != nil {
+		animCfg := component.Config().Animation
+		animEnabled = animCfg.Enabled
+		animDuration = time.Duration(animCfg.DurationMS) * time.Millisecond
+	}
+
+	// Shared activation may draw before the resize; enforce monitor bounds here.
+	m.win.Resize()
+	m.win.DrawRecursiveGrid(
+		bounds, depth, keys, dims, nextKeys, nextDims, style, virtualPointer,
+		animEnabled, animDuration,
+	)
+
+	return nil
+}
 
 func (m *Manager) animateMouseAction(
 	ctx context.Context,
