@@ -146,17 +146,23 @@ npx skills add y3owk1n/neru --skill neru-ask --skill neru-setup-config
 
 <table>
 <tr>
-<td align="center" width="33%">
-<img src="https://github.com/user-attachments/assets/0d46fa7c-345a-45ee-ad44-7a601c2b7cb1" alt="Recursive Grid Mode" /><br/>
-<sub><b>Recursive Grid</b> · start here</sub>
+<td align="center" width="50%">
+<img src="https://github.com/user-attachments/assets/d82e14fa-0ac4-4081-9a0a-f99243d1da5b" alt="Recursive Grid Mode" /><br/>
+<sub><b>Recursive Grid</b></sub>
 </td>
-<td align="center" width="33%">
-<img src="https://github.com/user-attachments/assets/d452f972-ce23-4798-955b-6dbfa8435504" alt="Grid Mode" /><br/>
-<sub><b>Grid</b></sub>
-</td>
-<td align="center" width="33%">
-<img src="https://github.com/user-attachments/assets/71b13850-1b87-40b5-9ac0-93cff1f2e89b" alt="Hints Mode" /><br/>
+<td align="center" width="50%">
+<img src="https://github.com/user-attachments/assets/a19ef869-6400-4b5f-b3c6-92af69c2a76b" alt="Hints Mode" /><br/>
 <sub><b>Hints</b></sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="https://github.com/user-attachments/assets/913e9d15-7f42-470d-b5cf-7a55065789fe" alt="Bisect Mode" /><br/>
+<sub><b>Bisect</b></sub>
+</td>
+<td align="center" width="50%">
+<img src="https://github.com/user-attachments/assets/392fcfa1-9779-464c-8bac-a05a6afc73c3" alt="Grid Mode" /><br/>
+<sub><b>Grid</b></sub>
 </td>
 </tr>
 </table>
