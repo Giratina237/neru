@@ -58,7 +58,7 @@ func TestHyprlandScrollSession_HoldsTheModifierAcrossEveryChunk(t *testing.T) {
 	scrolls := &uinputScrollRecorder{}
 	withUinputScrollRecorder(t, scrolls)
 
-	session := &hyprlandScrollSession{}
+	session := &hyprlandScrollSession{restore: func() {}}
 
 	pressed, err := pressWaylandModifiers(action.ModCtrl)
 	if err != nil {
@@ -84,6 +84,37 @@ func TestHyprlandScrollSession_HoldsTheModifierAcrossEveryChunk(t *testing.T) {
 
 	if len(scrolls.batches) != 3 {
 		t.Fatalf("scroll batches = %v, want one per chunk", scrolls.batches)
+	}
+}
+
+// TestHyprlandScrollSession_Close_RestoresHeldModifiersAfterRelease pins the
+// order that keeps a scroll unmodified end to end: the session's own press
+// comes off before the user's held chord goes back on, and the restore runs
+// even when the session pressed nothing.
+func TestHyprlandScrollSession_Close_RestoresHeldModifiersAfterRelease(t *testing.T) {
+	tests := []struct {
+		name    string
+		pressed action.Modifiers
+		want    []string
+	}{
+		{name: "pressed ctrl", pressed: action.ModCtrl, want: []string{ctrlUp, "restore"}},
+		{name: "pressed nothing", pressed: 0, want: []string{"restore"}},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			modifiers := &modifierRecorder{}
+			withModifierRecorder(t, modifiers)
+
+			session := &hyprlandScrollSession{
+				pressed: testCase.pressed,
+				restore: func() { modifiers.events = append(modifiers.events, "restore") },
+			}
+
+			session.close()
+
+			assertEvents(t, modifiers.events, testCase.want)
+		})
 	}
 }
 
@@ -133,7 +164,7 @@ func TestHyprlandScrollSession_Inject(t *testing.T) {
 			recorder := &uinputScrollRecorder{}
 			withUinputScrollRecorder(t, recorder)
 
-			session := &hyprlandScrollSession{}
+			session := &hyprlandScrollSession{restore: func() {}}
 
 			err := session.inject(testCase.deltaX, testCase.deltaY)
 			if err != nil {
@@ -151,7 +182,7 @@ func TestHyprlandScrollSession_Inject(t *testing.T) {
 func TestHyprlandScrollSession_InjectReportsAFailedBatch(t *testing.T) {
 	withUinputScrollRecorder(t, &uinputScrollRecorder{err: errScrollDeviceGone})
 
-	session := &hyprlandScrollSession{}
+	session := &hyprlandScrollSession{restore: func() {}}
 
 	err := session.inject(0, scrollPixelsPerNotch)
 	if !errors.Is(err, errScrollDeviceGone) {
@@ -163,7 +194,7 @@ func TestHyprlandScrollSession_InjectReportsAFailedBatch(t *testing.T) {
 // curve to. uinput scrolling is whole REL_WHEEL clicks, so a session claiming
 // to be continuous would have every sub-notch chunk silently dropped.
 func TestHyprlandScrollSession_Granularity(t *testing.T) {
-	session := &hyprlandScrollSession{}
+	session := &hyprlandScrollSession{restore: func() {}}
 
 	if got := session.granularity(); got != scrollPixelsPerNotch {
 		t.Fatalf("granularity() = %v, want %v", got, float64(scrollPixelsPerNotch))
