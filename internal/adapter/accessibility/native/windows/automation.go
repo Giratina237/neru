@@ -75,9 +75,14 @@ const (
 	vtRelease = 2
 
 	// IUIAutomation.
-	vtElementFromHandle       = 6
-	vtGetControlViewCondition = 18
-	vtCreateCacheRequest      = 20
+	vtElementFromHandle          = 6
+	vtElementFromPointBuildCache = 11
+	vtGetControlViewWalker       = 14
+	vtGetControlViewCondition    = 18
+	vtCreateCacheRequest         = 20
+
+	// IUIAutomationTreeWalker.
+	vtWalkerGetParentElementBuildCache = 9
 
 	// IUIAutomationElement. Only the cached getters are called: every property
 	// the walk reads is fetched by the cache request, so a Current* getter
@@ -189,6 +194,19 @@ type winElement struct {
 	clickable bool
 }
 
+// enumerateOptions steers one enumeration.
+type enumerateOptions struct {
+	// frame is the window's visible frame. Controls outside it are dropped
+	// and the rest are clipped to it. An empty frame disables both.
+	frame image.Rectangle
+	// roles is the set of UIA control-type names to keep. An empty set falls
+	// back to the shipped defaults.
+	roles map[string]struct{}
+	// visibleCheck hit-tests each control's center and drops the ones another
+	// element covers. It is hints.visible_check_enabled on Windows.
+	visibleCheck bool
+}
+
 // comCall invokes the method at vtable slot index on the COM object this.
 // It returns the HRESULT (or boolean/handle) in the low bits of the result.
 // comCall invokes the method at index in this object's COM vtable.
@@ -218,9 +236,10 @@ func failed(hresult uintptr) bool {
 }
 
 // enumerateClickableElements returns the on-screen, clickable controls of the
-// given top-level window handle. It returns nil on any failure; callers treat
-// an empty result as "no hints", never as a crash.
-func enumerateClickableElements(hwnd uintptr, keptRoles map[string]struct{}) []winElement {
+// given top-level window handle, filtered as opts says. It returns nil on any
+// failure; callers treat an empty result as "no hints", never as a crash.
+func enumerateClickableElements(hwnd uintptr, opts enumerateOptions) []winElement {
+	keptRoles := opts.roles
 	if len(keptRoles) == 0 {
 		keptRoles = defaultClickableRoles
 	}
@@ -293,7 +312,128 @@ func enumerateClickableElements(hwnd uintptr, keptRoles map[string]struct{}) []w
 	}
 	defer comCall(array, vtRelease)
 
-	return collectArray(array, keptRoles)
+	controls := collectArray(array, opts.frame, keptRoles)
+
+	if opts.visibleCheck {
+		controls = visibleControls(automation, cache, opts.frame, controls)
+	}
+
+	return controls
+}
+
+// visibleControls keeps the controls whose center hit-tests to themselves or
+// to a descendant, the same gate the AX walk applies behind
+// hints.visible_check_enabled. A control another element covers, in this
+// window or another, hit-tests to that element and is dropped. A hit-test
+// that fails keeps the control, so a provider that cannot answer does not
+// blank the hints.
+func visibleControls(
+	automation, cache unsafe.Pointer,
+	frame image.Rectangle,
+	controls []winElement,
+) []winElement {
+	var walker unsafe.Pointer
+
+	hresult := comCall(automation, vtGetControlViewWalker, uintptr(unsafe.Pointer(&walker)))
+	if failed(hresult) || walker == nil {
+		return controls
+	}
+	defer comCall(walker, vtRelease)
+
+	kept := controls[:0]
+
+	for _, control := range controls {
+		hit := elementAt(automation, cache, centerOf(control.bounds))
+		if hit == nil || hitReaches(walker, cache, hit, frame, control) {
+			kept = append(kept, control)
+		}
+	}
+
+	return kept
+}
+
+// elementAt returns the cached element under point, or nil when UIA has no
+// answer. The caller releases it.
+func elementAt(automation, cache unsafe.Pointer, point image.Point) unsafe.Pointer {
+	var hit unsafe.Pointer
+
+	hresult := comCall(
+		automation,
+		vtElementFromPointBuildCache,
+		packPoint(point),
+		uintptr(cache),
+		uintptr(unsafe.Pointer(&hit)),
+	)
+	if failed(hresult) || hit == nil {
+		return nil
+	}
+
+	return hit
+}
+
+// maxHitAncestors bounds the walk from a hit element up to the window root.
+// Real trees are far shallower; the bound only stops a provider that cycles.
+const maxHitAncestors = 64
+
+// hitReaches reports whether the hit element, or one of its control-view
+// ancestors, is the control: the same walk the AX check does with element
+// identity. Cached elements from two queries carry no comparable identity, so
+// each ancestor is matched on its control type, name and frame-clipped
+// bounds, all three of which the control itself satisfies and a covering
+// element does not. It releases hit.
+func hitReaches(
+	walker, cache unsafe.Pointer,
+	hit unsafe.Pointer,
+	frame image.Rectangle,
+	control winElement,
+) bool {
+	current := hit
+
+	for range maxHitAncestors {
+		candidate, ok := extractWinElement(current, frame, nil)
+		if ok && sameControl(candidate, control) {
+			comCall(current, vtRelease)
+
+			return true
+		}
+
+		var parent unsafe.Pointer
+
+		hresult := comCall(
+			walker,
+			vtWalkerGetParentElementBuildCache,
+			uintptr(current),
+			uintptr(cache),
+			uintptr(unsafe.Pointer(&parent)),
+		)
+
+		comCall(current, vtRelease)
+
+		if failed(hresult) || parent == nil {
+			return false
+		}
+
+		current = parent
+	}
+
+	comCall(current, vtRelease)
+
+	return false
+}
+
+// sameControl reports whether two extracted descriptions name one control.
+func sameControl(a, b winElement) bool {
+	return a.bounds == b.bounds && a.role == b.role && a.name == b.name
+}
+
+// packPoint lays a Win32 POINT out as the single register ElementFromPoint
+// takes it in: x in the low 32 bits, y in the high 32 bits.
+func packPoint(point image.Point) uintptr {
+	return uintptr(uint32(int32(point.X))) | uintptr(uint32(int32(point.Y)))<<32
+}
+
+func centerOf(rect image.Rectangle) image.Point {
+	return image.Pt(rect.Min.X+rect.Dx()/2, rect.Min.Y+rect.Dy()/2)
 }
 
 // createCacheRequest builds the cache request FindAllBuildCache fills: the
@@ -345,7 +485,11 @@ func createAutomation() unsafe.Pointer {
 
 // collectArray walks an IUIAutomationElementArray and extracts the clickable
 // controls. Each element is released as soon as its data is copied out.
-func collectArray(array unsafe.Pointer, keptRoles map[string]struct{}) []winElement {
+func collectArray(
+	array unsafe.Pointer,
+	frame image.Rectangle,
+	keptRoles map[string]struct{},
+) []winElement {
 	var length int32
 
 	hresult := comCall(array, vtArrayGetLength, uintptr(unsafe.Pointer(&length)))
@@ -363,7 +507,7 @@ func collectArray(array unsafe.Pointer, keptRoles map[string]struct{}) []winElem
 			continue
 		}
 
-		extracted, ok := extractWinElement(element, keptRoles)
+		extracted, ok := extractWinElement(element, frame, keptRoles)
 
 		comCall(element, vtRelease)
 
@@ -376,14 +520,20 @@ func collectArray(array unsafe.Pointer, keptRoles map[string]struct{}) []winElem
 }
 
 // extractWinElement copies the relevant properties from a single UIA element.
-// It returns ok=false for offscreen or zero-size controls, and for controls
-// whose role is not in keptRoles.
+// It returns ok=false for offscreen or zero-size controls, for controls whose
+// role is not in keptRoles (nil keeps every role), and for controls outside
+// frame. Bounds are clipped
+// to frame so a control straddling the window edge targets its visible part.
 //
 // Role selection happens here rather than downstream because the cache request
 // returns the whole control-view subtree: rejecting an element by role before
 // its bounds and name are decoded keeps the per-element work to one cached
 // read.
-func extractWinElement(element unsafe.Pointer, keptRoles map[string]struct{}) (winElement, bool) {
+func extractWinElement(
+	element unsafe.Pointer,
+	frame image.Rectangle,
+	keptRoles map[string]struct{},
+) (winElement, bool) {
 	var controlType int32
 	if failed(comCall(element, vtGetCachedControlType, uintptr(unsafe.Pointer(&controlType)))) {
 		return winElement{}, false
@@ -396,7 +546,7 @@ func extractWinElement(element unsafe.Pointer, keptRoles map[string]struct{}) (w
 		role = strconv.FormatInt(int64(controlType), 10)
 	}
 
-	if _, ok := keptRoles[role]; !ok {
+	if _, ok := keptRoles[role]; keptRoles != nil && !ok {
 		return winElement{}, false
 	}
 
@@ -411,7 +561,10 @@ func extractWinElement(element unsafe.Pointer, keptRoles map[string]struct{}) (w
 		return winElement{}, false
 	}
 
-	bounds := image.Rect(int(rect.left), int(rect.top), int(rect.right), int(rect.bottom))
+	bounds := clipToFrame(
+		image.Rect(int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)),
+		frame,
+	)
 	if bounds.Empty() {
 		return winElement{}, false
 	}
@@ -422,6 +575,21 @@ func extractWinElement(element unsafe.Pointer, keptRoles map[string]struct{}) (w
 		name:      cachedName(element),
 		clickable: true,
 	}, true
+}
+
+// clipToFrame returns the part of bounds inside the window frame, which is
+// empty for a control laid out past the window edge. An empty frame means the
+// frame is unknown and bounds come back unchanged.
+//
+// The provider sets IsOffscreen, and Chromium leaves it false for controls it
+// has laid out past the window edge, such as the hidden part of a long
+// vertical tab strip in Edge. Clipping to the window frame catches those.
+func clipToFrame(bounds, frame image.Rectangle) image.Rectangle {
+	if frame.Empty() {
+		return bounds
+	}
+
+	return bounds.Intersect(frame)
 }
 
 // cachedName reads the element's cached name (BSTR) and frees it.
