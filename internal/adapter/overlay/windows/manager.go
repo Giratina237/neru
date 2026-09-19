@@ -252,6 +252,20 @@ func (m *Manager) BuildComponents(
 	})
 }
 
+// ConfigureComponents hands the configuration to the render components, as
+// Base does, and then measures the characters this backend sizes its badges
+// around (manager.WarmBadgeTextWidths). This is where a configuration arrives,
+// at startup and on every reload, so the measuring is done here and a draw,
+// which runs with a key waiting on it, measures nothing.
+func (m *Manager) ConfigureComponents(cfg *config.Config, pointer manager.PointerAppearance) {
+	if m == nil {
+		return
+	}
+
+	m.Base.ConfigureComponents(cfg, pointer)
+	manager.WarmBadgeTextWidths(cfg)
+}
+
 // WaylandKeyboardChannel returns nil on Windows.
 func (m *Manager) WaylandKeyboardChannel() <-chan string {
 	return nil
@@ -398,7 +412,8 @@ func (m *Manager) DrawHintSearchInput(
 		label += " /"
 	}
 
-	badgeWidth := badge.EstimateTextWidth(label, fontSize) + paddingX*winPaddingMultiplier
+	badgeWidth := badge.TextWidth(label, style.FontFamily(), fontSize, false) +
+		paddingX*winPaddingMultiplier
 	badgeHeight := badge.EstimateTextHeight(fontSize) + paddingY*winPaddingMultiplier
 	bounds := image.Rect(pos.X, pos.Y, pos.X+max(badgeWidth, width), pos.Y+badgeHeight)
 
@@ -476,7 +491,9 @@ func (m *Manager) DrawModeIndicator(cursorX, cursorY int) {
 
 	paddingX := badge.AutoPadding(fontSize, scaledConfig(cfg.UI.PaddingX, scale), true)
 	paddingY := badge.AutoPadding(fontSize, scaledConfig(cfg.UI.PaddingY, scale), false)
-	badgeWidth := badge.EstimateTextWidth(label, fontSize) + paddingX*winPaddingMultiplier
+	badgeWidth := badge.TextWidth(
+		label, ports.ResolveFont(cfg.UI.FontFamily), fontSize, true,
+	) + paddingX*winPaddingMultiplier
 	badgeHeight := badge.EstimateTextHeight(fontSize) + paddingY*winPaddingMultiplier
 	borderWidth := scaledInt(max(cfg.UI.BorderWidth, 0), scale)
 
@@ -583,7 +600,9 @@ func (m *Manager) DrawStickyModifiersIndicator(cursorX, cursorY int, symbols str
 
 	paddingX := badge.AutoPadding(fontSize, scaledConfig(indicatorUI.PaddingX, scale), true)
 	paddingY := badge.AutoPadding(fontSize, scaledConfig(indicatorUI.PaddingY, scale), false)
-	badgeWidth := badge.EstimateTextWidth(symbols, fontSize) + paddingX*winPaddingMultiplier
+	badgeWidth := badge.TextWidth(
+		symbols, ports.ResolveFont(indicatorUI.FontFamily), fontSize, true,
+	) + paddingX*winPaddingMultiplier
 	badgeHeight := badge.EstimateTextHeight(fontSize) + paddingY*winPaddingMultiplier
 	borderWidth := scaledInt(max(indicatorUI.BorderWidth, 0), scale)
 

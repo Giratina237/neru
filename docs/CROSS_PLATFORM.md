@@ -184,6 +184,7 @@ answer.
 | **Modifier passthrough**      | ✅                       | ❌                     | ✅ evdev backend only        | ✅ evdev backend only   | ✅ `WH_KEYBOARD_LL` forwards or blocks per event |
 | **Dark mode detection**       | ✅ Cocoa appearance      | ✅ xdg appearance portal | ✅ xdg appearance portal   | ✅ kdeglobals + portal  | ✅ registry                  |
 | **Font resolution**           | ✅ NSFont                | ✅ fontconfig          | ✅ fontconfig                | ✅ fontconfig           | ✅ GDI `EnumFontFamiliesExW` ¹ |
+| **Text measurement**          | ✅ CoreText              | ✅ Cairo text extents ¹ | ✅ Cairo text extents ¹      | ✅ Cairo text extents ¹ | ✅ GDI `GetTextExtentPoint32W` ¹ |
 | **System tray**               | ✅ NSStatusItem ⁸        | ✅ D-Bus StatusNotifierItem ⁸ | ✅ StatusNotifierItem ⁸      | ✅ StatusNotifierItem ⁸ | ✅ Win32 notification area ⁸ |
 | **Native alerts**             | ✅ NSAlert               | ⚠️ D-Bus, not modal    | ⚠️ D-Bus, not modal          | ⚠️ D-Bus, not modal     | ✅ `MessageBoxW`             |
 | **Native notifications**      | ✅ UNNotification        | ✅ `org.freedesktop.Notifications` | ✅ `org.freedesktop.Notifications` | ✅ `org.freedesktop.Notifications` | ✅ Tray balloon tips ⁸ |
@@ -205,6 +206,23 @@ check nothing and let NSFont / Cairo substitute at draw time. The generic names
 resolve to each platform's own faces
 (`internal/adapter/platform/fontgeneric`, ADR 0007); answers are cached per
 family name (`internal/adapter/platform/fontcache`).
+
+**Text measurement** (`ports.TextMeasurer`) is the same text layer asked how
+much room a string takes, off the draw path and cached per string and font in
+the same package. It never hops to a UI thread. On Windows GDI measures for
+both renderers. The non-CGO Linux build has no Cairo and reports
+`CodeNotSupported`, which leaves callers on their estimate.
+
+The Linux and Windows backends size every box drawn around text from it: hint
+badges, the hint search badge, the mode and sticky-modifier indicators,
+recursive-grid label plates and the monitor picker's badge (`badge.TextWidth`).
+Widths are kept per character and per unit of font size, in a table per family
+and weight, so one table serves every size and display scale. Both backends
+fill the tables when a configuration is applied (`manager.WarmBadgeTextWidths`),
+so a draw measures nothing. They used to give every character 0.7 of the font
+size, which a W outgrows and an I never fills, so a box clipped wide labels on
+the GDI renderer, which clips text to its rectangle, and sat loose around narrow
+ones. macOS has always measured.
 
 ² **Service management** is the one row whose limit is not the display server:
 it needs **systemd**, on every Linux backend. runit, OpenRC and s6 get
@@ -653,9 +671,22 @@ backtracking, and every scroll granularity.
 > **`recursive_grid.ui.sub_key_preview` is one drawing on all three platforms**
 > ([#1297](https://github.com/y3owk1n/neru/issues/1297)), and
 > `sub_key_preview_autohide_multiplier` measures a **sub-cell** from one
-> implementation (`recursivegrid.Style.ShowSubKeyPreviewIn`, with the macOS
-> copy held to it by
-> `internal/architecture/sub_key_preview_autohide_rule_test.go`).
+> implementation (`recursivegrid.Style.SubKeyPreviewFontSizeIn`).
+
+> **Region-grid labels are fitted to their cells by one implementation on all
+> three platforms** ([#1691](https://github.com/y3owk1n/neru/issues/1691)):
+> `recursivegrid.Style.FitDraw` answers once per draw, from text measured when
+> the Style was built (`ports.TextMeasurer`), and `FitTransition` answers what
+> a depth transition holds from its first frame to its last. macOS is handed
+> both answers before its animation starts, because its frames never return to
+> Go. Its Objective-C copy of the autohide rule and the two tests pinning that
+> copy were deleted. The fit takes the display scale, so a dense X11 or Windows
+> display no longer keeps a label that its drawn font has outgrown.
+> Grid mode fits its labels the same way (`grid.Style.LabelFontSizeFor`), at
+> the alphabet's average character width and never hiding one. The monitor
+> picker fits its key and the monitor's name to the badge, per monitor
+> (`manager.MonitorSelectStyle.FittedTo`). All three backends capped the badge
+> at 80% of the monitor and none of them fitted the text drawn in it.
 
 ---
 
@@ -864,7 +895,7 @@ capability. If they need it, it is a port. All four, or it is not done:
 
 Current ports: `SystemPort`, `AccessibilityPort`, `OverlayPort`, `EventTapPort`,
 `HotkeyPort`, `IPCPort`, `VisionPort`, `TextInputPort`, `KeyFeedPort`,
-`AppWatcherPort`, `SystrayPort`, `FontResolver`.
+`AppWatcherPort`, `SystrayPort`, `FontResolver`, `TextMeasurer`.
 
 Optional extensions (Tier 3): `RelativeCursorMover`, `CursorSynchronizer`
 and `InstantCursorMover` on `SystemPort`, `HotkeyReleaseRegistrar` and

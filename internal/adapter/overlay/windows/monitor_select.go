@@ -76,12 +76,12 @@ func monitorSelectPanelLayout(
 		)
 	}
 
-	labelW := badge.EstimateTextWidth(label, labelFont)
+	labelW := badge.TextWidth(label, style.FontFamily, labelFont, true)
 	labelH := badge.EstimateTextHeight(labelFont)
 
 	subW, subH, gap := 0, 0, 0
 	if subtitle != "" {
-		subW = badge.EstimateTextWidth(subtitle, subFont)
+		subW = badge.TextWidth(subtitle, style.SubtitleFontFamily, subFont, false)
 		subH = badge.EstimateTextHeight(subFont)
 		gap = scaledInt(monitorSelectLabelGap, scale)
 	}
@@ -175,14 +175,16 @@ func (m *Manager) DrawMonitorSelect(
 		// Each panel is on its own monitor, at that monitor's scale.
 		scale := win.Scale()
 		borderWidth := float64(style.BorderWidth) * scale
-		labelFont := monitorSelectFontOr(style.FontSize, monitorSelectDefaultFont) * scale
-		subtitleFont := monitorSelectFontOr(
-			style.SubtitleFontSize,
-			monitorSelectDefaultSubFont,
-		) * scale
+
+		// Each monitor fits its own text, because they differ in size, in scale and in
+		// name. The panel is laid out from the fitted style, so it is sized
+		// to the text that is drawn.
+		fitted := style.FittedTo(target, scale)
+		labelFont := float64(fitted.FontSize) * scale
+		subtitleFont := float64(fitted.SubtitleFontSize) * scale
 
 		panel, labelRect, subtitleRect, radius := monitorSelectPanelLayout(
-			target.Bounds, target.Label, target.Subtitle, style, scale,
+			target.Bounds, target.Label, target.Subtitle, fitted, scale,
 		)
 		panel = panel.Sub(target.Bounds.Min)
 		labelRect = labelRect.Sub(target.Bounds.Min)

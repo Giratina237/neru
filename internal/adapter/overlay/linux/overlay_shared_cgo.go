@@ -661,8 +661,13 @@ func (o *sharedOverlay) drawMonitorSelect(
 			o.drawRect(target.Bounds, spec.backdrop, 0, 0)
 		}
 
+		// Each monitor fits its own text, because they differ in size, and so do their
+		// names. The panel is laid out from the fitted style, so it is sized
+		// to the text that is drawn.
+		fitted := style.FittedTo(target, o.srf.surfaceScale())
+
 		panel, labelRect, subtitleRect, radius := monitorSelectPanelLayout(
-			target.Bounds, target.Label, target.Subtitle, style, o.srf.surfaceScale(),
+			target.Bounds, target.Label, target.Subtitle, fitted, o.srf.surfaceScale(),
 		)
 		o.drawRoundedRect(panel, radius, spec.background, spec.border, spec.borderWidth)
 
@@ -670,7 +675,7 @@ func (o *sharedOverlay) drawMonitorSelect(
 			target.Label,
 			labelRect,
 			style.FontFamily,
-			spec.labelFont,
+			float64(fitted.FontSize),
 			spec.text,
 			true,
 		)
@@ -680,7 +685,7 @@ func (o *sharedOverlay) drawMonitorSelect(
 			// the label's family with the rest of the Style.
 			o.drawTextCentered(
 				target.Subtitle, subtitleRect,
-				style.SubtitleFontFamily, spec.subtitleFont, spec.subtitleText,
+				style.SubtitleFontFamily, float64(fitted.SubtitleFontSize), spec.subtitleText,
 				false,
 			)
 		}
@@ -761,7 +766,8 @@ func (o *sharedOverlay) repaintHints(
 		sfont := fontSize * o.srf.surfaceScale()
 		paddingX := badge.AutoPadding(sfont, style.PaddingX(), true)
 		paddingY := badge.AutoPadding(sfont, style.PaddingY(), false)
-		badgeWidth := badge.EstimateTextWidth(label, sfont) + paddingX*paddingMultiplier
+		badgeWidth := badge.TextWidth(label, style.FontFamily(), sfont, true) +
+			paddingX*paddingMultiplier
 		badgeHeight := badge.EstimateTextHeight(sfont) + paddingY*paddingMultiplier
 
 		radius := style.BorderRadius()
@@ -832,7 +838,7 @@ func (o *sharedOverlay) drawHintSearchInput(
 		frame.Position(),
 		frame.Width(),
 		label,
-		fontSize*o.srf.surfaceScale(),
+		badge.TextFont{Family: style.FontFamily(), Size: fontSize * o.srf.surfaceScale()},
 		style.PaddingX(),
 		style.PaddingY(),
 	))
@@ -1079,6 +1085,13 @@ func (o *sharedOverlay) startGridAnimation(
 	startTime := time.Now()
 	o.animSettled = false
 
+	// Both are fitted before the first frame, so no frame fits a font of its
+	// own. held is what the transition draws at, and settled is what the frame
+	// it ends on draws at.
+	scale := o.srf.surfaceScale()
+	held := style.FitTransition(scale, fromRects, toRects, nextDims)
+	settled := style.FitDraw(scale, toRects, nextDims)
+
 	// Called under renderMu. The progress is read here rather than before the
 	// lock was taken, so a frame that waited on it paints where the cells are
 	// now rather than where they were when it was scheduled.
@@ -1098,6 +1111,11 @@ func (o *sharedOverlay) startGridAnimation(
 		o.animPointer = pointer.Position
 		o.animSettled = rawProgress >= 1
 
+		sizes := held
+		if o.animSettled {
+			sizes = settled
+		}
+
 		o.srf.clearFrame()
 		o.drawFrame(
 			interpCells,
@@ -1105,6 +1123,7 @@ func (o *sharedOverlay) startGridAnimation(
 			nextKeyRunes,
 			nextDims,
 			style,
+			sizes,
 			pointer,
 		)
 
@@ -1197,6 +1216,7 @@ func (o *sharedOverlay) clearAndDraw(
 		nextKeyRunes,
 		nextDims,
 		style,
+		style.FitDraw(o.srf.surfaceScale(), cellRects, nextDims),
 		virtualPointer,
 	)
 }
@@ -1206,9 +1226,13 @@ func (o *sharedOverlay) drawFrame(
 	keyRunes, nextKeyRunes []rune,
 	nextDims domain.GridDimensions,
 	style recursivegridcomponent.Style,
+	sizes recursivegridcomponent.FittedSizes,
 	virtualPointer recursivegridcomponent.VirtualPointerState,
 ) {
-	drawSubPreview := style.PreviewsNextDepth(len(nextKeyRunes), nextDims)
+	// sizes is one answer for the whole frame (Style.FitDraw), so every label
+	// matches and nothing is fitted per cell.
+	drawSubPreview := sizes.ShowPreview &&
+		style.PreviewsNextDepth(len(nextKeyRunes), nextDims)
 
 	for idx, cell := range cellRects {
 		if cell.Empty() {
@@ -1228,21 +1252,20 @@ func (o *sharedOverlay) drawFrame(
 				label = string(keyRunes[idx])
 			}
 
-			if style.ShowLabelIn(cell) {
+			if sizes.ShowLabel {
 				if style.LabelBackground() {
-					o.drawLabelBackground(label, cell, style)
+					o.drawLabelBackground(label, cell, style, sizes.LabelSize)
 				}
 
 				o.drawTextCentered(
 					label, cell, style.FontFamily(),
-					style.LabelFontSize(), style.TextColorARGB(),
+					sizes.LabelSize, style.TextColorARGB(),
 					false,
 				)
 			}
 
-			if drawSubPreview &&
-				style.ShowSubKeyPreviewIn(cell, nextDims) {
-				o.drawSubKeyMiniGrid(cell, nextKeyRunes, nextDims, style)
+			if drawSubPreview {
+				o.drawSubKeyMiniGrid(cell, nextKeyRunes, nextDims, style, sizes.PreviewSize)
 			}
 		}
 	}
@@ -1313,6 +1336,10 @@ func (o *sharedOverlay) redrawGrid() {
 	style := o.cachedStyle
 	prefix := o.currentPrefix
 
+	// One size for the whole grid, fitted once per draw rather than per cell.
+	// The cells are device pixels, and drawTextCentered applies the surface scale.
+	labelSize := style.LabelFontSizeFor(o.srf.surfaceScale(), o.cachedGrid)
+
 	for _, cell := range o.cachedGrid.AllCells() {
 		label := strings.ToUpper(cell.Coordinate())
 
@@ -1334,7 +1361,7 @@ func (o *sharedOverlay) redrawGrid() {
 		cellBounds := o.offset(cell.Bounds())
 		o.drawRect(cellBounds, fill, border, style.LineWidth())
 		o.drawTextCentered(label, cellBounds,
-			style.FontFamily(), style.LabelFontSize(), text, false)
+			style.FontFamily(), labelSize, text, false)
 	}
 
 	o.paintGridPointer()
@@ -1353,6 +1380,7 @@ func (o *sharedOverlay) drawSubgrid(bounds image.Rectangle, style gridcomponent.
 	// The rectangles they are drawn on, which are the rectangles the mode layer
 	// moves the cursor into (internal/domain/grid/subgrid_cells.go).
 	cells := domainGrid.SubgridCells(bounds, domain.SubgridDimensions())
+	labelSize := style.SubgridLabelFontSizeIn(o.srf.surfaceScale(), subgridFontScale, cells)
 
 	// One cell per key, and fewer keys than cells is a configuration that
 	// leaves the last cells unlabelled: the key set is capped at the same count
@@ -1365,7 +1393,7 @@ func (o *sharedOverlay) drawSubgrid(bounds image.Rectangle, style gridcomponent.
 		o.drawTextCentered(
 			string(key), cell,
 			style.FontFamily(),
-			style.LabelFontSize()*subgridFontScale,
+			labelSize,
 			style.TextColorARGB(),
 			false,
 		)
@@ -1441,14 +1469,15 @@ func (o *sharedOverlay) drawTextCentered(
 func (o *sharedOverlay) drawLabelBackground(
 	label string, cell image.Rectangle,
 	style recursivegridcomponent.Style,
+	labelSize float64,
 ) {
 	// Match the scaled font that drawTextCentered renders for the label.
-	fontSize := style.LabelFontSize() * o.srf.surfaceScale()
+	fontSize := labelSize * o.srf.surfaceScale()
 	paddingX := badge.AutoPadding(fontSize,
 		style.LabelBackgroundPaddingX(), true)
 	paddingY := badge.AutoPadding(fontSize,
 		style.LabelBackgroundPaddingY(), false)
-	width := badge.EstimateTextWidth(label, fontSize) +
+	width := badge.TextWidth(label, style.FontFamily(), fontSize, false) +
 		paddingX*paddingMultiplier
 	height := badge.EstimateTextHeight(fontSize) +
 		paddingY*paddingMultiplier
@@ -1476,11 +1505,12 @@ func (o *sharedOverlay) drawSubKeyMiniGrid(
 	nextKeyRunes []rune,
 	nextDims domain.GridDimensions,
 	style recursivegridcomponent.Style,
+	previewSize float64,
 ) {
 	for _, subCell := range style.SubKeyPreviewCells(cell, nextKeyRunes, nextDims) {
 		o.drawTextCentered(
 			subCell.Label, subCell.Bounds,
-			style.FontFamily(), style.SubKeyPreviewFontSizeF(),
+			style.FontFamily(), previewSize,
 			style.SubKeyPreviewTextColorARGB(),
 			false,
 		)

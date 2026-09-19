@@ -346,6 +346,20 @@ func (m *Manager) BuildComponents(
 	})
 }
 
+// ConfigureComponents hands the configuration to the render components, as
+// Base does, and then measures the characters this backend sizes its badges
+// around (manager.WarmBadgeTextWidths). This is where a configuration arrives,
+// at startup and on every reload, so the measuring is done here and a draw,
+// which runs with a key waiting on it, measures nothing.
+func (m *Manager) ConfigureComponents(cfg *config.Config, pointer manager.PointerAppearance) {
+	if m == nil {
+		return
+	}
+
+	m.Base.ConfigureComponents(cfg, pointer)
+	manager.WarmBadgeTextWidths(cfg)
+}
+
 // Ensure the manager keeps declaring the optional headless capability. Its own
 // BuildComponents reads Headless directly, so drift there fails to compile;
 // this pins the shared spelling every backend answers headlessness with.
@@ -916,12 +930,12 @@ func monitorSelectPanelLayout(
 		)
 	}
 
-	labelW := badge.EstimateTextWidth(label, labelFont)
+	labelW := badge.TextWidth(label, style.FontFamily, labelFont, true)
 	labelH := badge.EstimateTextHeight(labelFont)
 
 	subW, subH, gap := 0, 0, 0
 	if subtitle != "" {
-		subW = badge.EstimateTextWidth(subtitle, subFont)
+		subW = badge.TextWidth(subtitle, style.SubtitleFontFamily, subFont, false)
 		subH = badge.EstimateTextHeight(subFont)
 		gap = int(math.Round(float64(monitorSelectLabelGap) * scale))
 	}
@@ -974,9 +988,10 @@ func monitorSelectPanelLayout(
 	return panel, labelRect, subtitleRect, radius
 }
 
-// monitorSelectDrawSpec holds the once-parsed colors and base (unscaled) font
-// sizes shared by both backends' DrawMonitorSelect. Base font sizes are passed
-// to drawTextCentered, which applies the backend scale (X11) or none (Wayland).
+// monitorSelectDrawSpec holds the once-parsed colors shared by both backends'
+// DrawMonitorSelect. The font sizes are not here, because each target fits its own
+// (manager.MonitorSelectStyle.FittedTo), and the base size is passed to
+// drawTextCentered, which applies the backend scale (X11) or none (Wayland).
 // Like darwin, every panel's label uses the single text color (matched/selected
 // state is not visually distinguished).
 type monitorSelectDrawSpec struct {
@@ -986,8 +1001,6 @@ type monitorSelectDrawSpec struct {
 	text         uint32
 	subtitleText uint32
 	borderWidth  float64
-	labelFont    float64
-	subtitleFont float64
 	hasBackdrop  bool
 }
 
@@ -999,8 +1012,6 @@ func newMonitorSelectDrawSpec(style manager.MonitorSelectStyle) monitorSelectDra
 		text:         badge.ParseHexARGB(style.TextColor),
 		subtitleText: badge.ParseHexARGB(style.SubtitleTextColor),
 		borderWidth:  float64(max(style.BorderWidth, 1)),
-		labelFont:    monitorSelectFontOr(style.FontSize, monitorSelectDefaultFont),
-		subtitleFont: monitorSelectFontOr(style.SubtitleFontSize, monitorSelectDefaultSubFont),
 		hasBackdrop:  strings.TrimSpace(style.BackdropColor) != "",
 	}
 }
@@ -1448,7 +1459,8 @@ func badgeBounds(posX, posY int, text string, style overlayBadgeStyle) image.Rec
 		posX, posY,
 		style.offsetX, style.offsetY,
 		text,
-		style.fontSize,
+		// An indicator badge is drawn bold (drawBadge).
+		badge.TextFont{Family: style.fontFamily, Size: style.fontSize, Bold: true},
 		style.paddingX, style.paddingY,
 	)
 }
