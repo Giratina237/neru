@@ -1324,6 +1324,7 @@ first level is the focused window instead of the whole screen.
 | `min_size_width`  | int    | `1`           | Minimum cell width, in apparent pixels (scaled with the display on Windows and X11) |
 | `min_size_height` | int    | `1`           | Minimum cell height, in apparent pixels (scaled with the display on Windows and X11) |
 | `max_depth`       | int    | `10`          | Maximum recursion levels (1–20)                                  |
+| `max_depth_nudge` | bool   | `false`       | Keep grid active at max depth and center grid on selected cell   |
 | `layers`          | array  | `[]`          | Per-depth layout overrides (see below)                           |
 
 #### Layers

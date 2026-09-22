@@ -178,6 +178,12 @@ func flagCases() map[modecmd.Flag]flagCase {
 			applied: func(a modecmd.Activation) bool { return a.ZoomAroundCursor != nil },
 			build:   func(a *modecmd.Activation) { a.ZoomAroundCursor = new(2) },
 		},
+		modecmd.FlagMaxDepthNudge: {
+			mode:    domain.ModeRecursiveGrid,
+			args:    []string{"--max-depth-nudge"},
+			applied: func(a modecmd.Activation) bool { return a.MaxDepthNudge != nil && *a.MaxDepthNudge },
+			build:   func(a *modecmd.Activation) { a.MaxDepthNudge = new(true) },
+		},
 		modecmd.FlagCursorSelectionMode: {
 			mode:    domain.ModeGrid,
 			args:    []string{"--cursor-selection-mode=hold"},
