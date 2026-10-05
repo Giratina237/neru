@@ -84,7 +84,13 @@ func (h *ModesHandler) activationHandler(
 			return refusalFor(modecmd.NotDeclared(activation.Name))
 		}
 
-		h.modes.ActivateMode(activation)
+		if !h.modes.ActivateEnabledMode(activation) {
+			return ipc.Response{
+				Success: false,
+				Message: domain.ModeString(mode) + " mode is disabled in the configuration",
+				Code:    ipc.CodeModeDisabled,
+			}
+		}
 
 		return ipc.Response{Success: true, Message: activated, Code: ipc.CodeOK}
 	}
