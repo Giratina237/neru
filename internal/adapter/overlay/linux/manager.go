@@ -666,6 +666,10 @@ func (m *Manager) DrawRecursiveGrid(
 	style recursivegrid.Style,
 	virtualPointer recursivegrid.VirtualPointerState,
 ) error {
+	virtualPointer.Visible = true
+	if virtualPointer.Position.X == 0 && virtualPointer.Position.Y == 0 {
+		virtualPointer.Position = image.Pt(bounds.Min.X + bounds.Dx()/2, bounds.Min.Y + bounds.Dy()/2)
+	}
 	return m.drawRegionGrid(
 		m.RecursiveGridOverlay(),
 		"recursive grid",
@@ -682,6 +686,10 @@ func (m *Manager) DrawBisect(
 	style recursivegrid.Style,
 	virtualPointer recursivegrid.VirtualPointerState,
 ) error {
+	virtualPointer.Visible = true
+	if virtualPointer.Position.X == 0 && virtualPointer.Position.Y == 0 {
+		virtualPointer.Position = image.Pt(bounds.Min.X + bounds.Dx()/2, bounds.Min.Y + bounds.Dy()/2)
+	}
 	return m.drawRegionGrid(
 		m.BisectOverlay(),
 		"bisect",
@@ -730,6 +738,7 @@ func (m *Manager) DrawGridPointer(
 		FillColor: appearance.FillColor,
 		Char:      appearance.Char,
 		FontName:  appearance.FontFamily,
+		Shape:     appearance.Shape,
 	})
 }
 

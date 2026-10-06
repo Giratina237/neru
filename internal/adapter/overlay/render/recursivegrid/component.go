@@ -12,4 +12,5 @@ type VirtualPointerState struct {
 	FillColor string
 	Char      string
 	FontName  string
+	Shape     string
 }

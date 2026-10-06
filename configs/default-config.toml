@@ -340,6 +340,8 @@ sub_key_preview_label_char = ""
 char = "●"
 font_size = 8
 font_family = ""
+# shape = ""           # Pointer shape: "circle" (default), "crosshair", "dot", or "custom" (uses char)
+# fill_color = ""      # Fill/background color of the pointer; empty means use text_color
 
 # Mouse action indicator (macOS)
 # See https://github.com/y3owk1n/neru/blob/main/docs/reference/configuration.md#mouse_action_indicator

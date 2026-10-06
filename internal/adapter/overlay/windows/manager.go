@@ -933,6 +933,7 @@ func (m *Manager) DrawGridPointer(
 		FillColor: appearance.FillColor,
 		Char:      appearance.Char,
 		FontName:  appearance.FontFamily,
+		Shape:     appearance.Shape,
 	})
 }
 

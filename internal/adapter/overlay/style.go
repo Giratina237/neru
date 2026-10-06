@@ -51,6 +51,7 @@ type VirtualPointerStyle struct {
 	FillColor  string
 	Char       string
 	FontFamily string
+	Shape      string
 }
 
 // StyleSource is what a caller that needs a resolved Style depends on. It is
@@ -242,6 +243,7 @@ func pointerAppearance(style VirtualPointerStyle) PointerAppearance {
 		FontFamily: style.FontFamily,
 		Char:       style.Char,
 		FontSize:   style.FontSize,
+		Shape:      style.Shape,
 	}
 }
 
@@ -262,9 +264,14 @@ func buildVirtualPointerStyle(
 		char = config.DefaultVirtualPointerChar
 	}
 
+	color := cfg.UI.TextColor
+	if cfg.UI.FillColor.Light != "" || cfg.UI.FillColor.Dark != "" {
+		color = cfg.UI.FillColor
+	}
+
 	return VirtualPointerStyle{
 		FontSize: size,
-		FillColor: cfg.UI.TextColor.ForTheme(
+		FillColor: color.ForTheme(
 			theme,
 			config.VirtualPointerTextColorLight,
 			config.VirtualPointerTextColorDark,
@@ -274,6 +281,7 @@ func buildVirtualPointerStyle(
 		// generic alias reaches the platform as a family it can actually find
 		// rather than as a name nothing is installed under (#1305).
 		FontFamily: ports.ResolveFont(cfg.UI.FontFamily),
+		Shape:      cfg.UI.Shape,
 	}
 }
 

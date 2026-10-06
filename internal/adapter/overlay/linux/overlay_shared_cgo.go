@@ -1401,27 +1401,32 @@ func (o *sharedOverlay) drawRadialDualGridLines(
 
 //nolint:mnd,varnamelen
 func (o *sharedOverlay) drawVirtualPointer(vp recursivegridcomponent.VirtualPointerState) {
-	vpChar := vp.Char
-	if vpChar == "" {
-		vpChar = "\u25CF"
-	}
-
-	// FontName arrives resolved: it comes from the Style, which settles every
-	// family it hands out. Resolving again here would be a lock and a cache
-	// lookup per drawn frame for the same answer.
-	fontName := vp.FontName
-	fontSize := float64(vp.Size)
-	// Not badge.CenteredOn: the half is floored at 1 so a pointer configured to
-	// size 0 or 1 still has a box to draw its glyph in.
+	fillARGB := badge.ParseHexARGB(vp.FillColor)
 	halfSize := max(vp.Size/2, 1)
-	vpBounds := image.Rect(
-		vp.Position.X-halfSize,
-		vp.Position.Y-halfSize,
-		vp.Position.X+halfSize,
-		vp.Position.Y+halfSize,
-	)
-	o.drawTextCentered(vpChar, vpBounds, fontName, fontSize,
-		badge.ParseHexARGB(vp.FillColor), false)
+	cx := vp.Position.X
+	cy := vp.Position.Y
+
+	switch vp.Shape {
+	case "circle":
+		vpBounds := image.Rect(cx-halfSize, cy-halfSize, cx+halfSize, cy+halfSize)
+		o.drawRoundedRect(vpBounds, float64(halfSize), fillARGB, 0, 0)
+	case "crosshair":
+		armLen := halfSize
+		armThick := max(2, armLen/4)
+		halfThick := armThick / 2
+		o.drawRect(image.Rect(cx-armLen, cy-halfThick, cx+armLen, cy+halfThick), fillARGB, 0, 0)
+		o.drawRect(image.Rect(cx-halfThick, cy-armLen, cx+halfThick, cy+armLen), fillARGB, 0, 0)
+	case "dot":
+		dotHalf := max(halfSize/2, 1)
+		o.drawRect(image.Rect(cx-dotHalf, cy-dotHalf, cx+dotHalf, cy+dotHalf), fillARGB, 0, 0)
+	default:
+		vpChar := vp.Char
+		if vpChar == "" {
+			vpChar = "\u25CF"
+		}
+		vpBounds := image.Rect(cx-halfSize, cy-halfSize, cx+halfSize, cy+halfSize)
+		o.drawTextCentered(vpChar, vpBounds, vp.FontName, float64(vp.Size), fillARGB, false)
+	}
 }
 
 // redrawGrid paints the grid surface as it currently stands, which is either

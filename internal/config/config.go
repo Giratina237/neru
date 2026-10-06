@@ -587,6 +587,8 @@ type VirtualPointerUI struct {
 	FontSize   int    `json:"fontSize"   toml:"font_size"`
 	FontFamily string `json:"fontFamily" toml:"font_family"`
 	TextColor  Color  `json:"textColor"  toml:"text_color"`
+	Shape      string `json:"shape"      toml:"shape"`
+	FillColor  Color  `json:"fillColor"  toml:"fill_color"`
 }
 
 // VirtualPointerConfig styles the standalone pointer drawn when the system

@@ -921,17 +921,14 @@ func gridSurfacePointer(
 	pointer ports.GridPointer,
 	style VirtualPointerStyle,
 ) overlayRecursiveGrid.VirtualPointerState {
-	if !pointer.Visible {
-		return overlayRecursiveGrid.VirtualPointerState{}
-	}
-
 	return overlayRecursiveGrid.VirtualPointerState{
-		Visible:   true,
+		Visible:   pointer.Visible,
 		Position:  pointer.Position,
 		Size:      style.FontSize,
 		FillColor: style.FillColor,
 		Char:      style.Char,
 		FontName:  style.FontFamily,
+		Shape:     style.Shape,
 	}
 }
 

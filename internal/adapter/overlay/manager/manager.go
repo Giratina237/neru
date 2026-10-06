@@ -116,6 +116,7 @@ type PointerAppearance struct {
 	// FontSize is the glyph's point size, with a configured value below 1
 	// already replaced by the documented default.
 	FontSize int
+	Shape    string
 }
 
 // MonitorSelectStyle carries the resolved (theme-applied) appearance for the
