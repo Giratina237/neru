@@ -221,8 +221,9 @@ const (
 	DefaultRecursiveGridMinFontSize = 6
 	// DefaultVirtualPointerChar is the default character displayed by the virtual pointer.
 	DefaultVirtualPointerChar = "\u25CF" // "●"
+	DefaultVirtualPointerShape = ""
 	// DefaultVirtualPointerFontSize is the default font size for the virtual pointer char.
-	DefaultVirtualPointerFontSize = 8
+	DefaultVirtualPointerFontSize = 32
 	// DefaultVirtualPointerFontFamily is the default font family for the virtual pointer char.
 	DefaultVirtualPointerFontFamily = ""
 	// DefaultMouseActionIndicatorSize is the default mouse action indicator diameter in points.
@@ -639,6 +640,8 @@ func defaultVirtualPointer() VirtualPointerConfig {
 			FontSize:   DefaultVirtualPointerFontSize,
 			FontFamily: DefaultVirtualPointerFontFamily,
 			TextColor:  Color{},
+			FillColor:  Color{},
+			Shape:      DefaultVirtualPointerShape,
 		},
 	}
 }

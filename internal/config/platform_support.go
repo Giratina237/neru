@@ -374,6 +374,8 @@ func PlatformSupport() parity.Declaration {
 			"virtual_pointer.ui.char",
 			"virtual_pointer.ui.font_size",
 			"virtual_pointer.ui.font_family",
+			"virtual_pointer.ui.shape",
+			"virtual_pointer.ui.fill_color",
 
 			"mouse_action_indicator.enabled",
 			"mouse_action_indicator.actions",

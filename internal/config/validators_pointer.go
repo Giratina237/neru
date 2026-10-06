@@ -152,6 +152,7 @@ func (c *Config) ValidateHeldRepeat(warnings *Warnings) error {
 func (c *Config) ValidateVirtualPointer() error {
 	err := validateColors([]colorField{
 		{c.VirtualPointer.UI.TextColor, "virtual_pointer.ui.text_color"},
+		{c.VirtualPointer.UI.FillColor, "virtual_pointer.ui.fill_color"},
 	})
 	if err != nil {
 		return err
@@ -172,6 +173,15 @@ func (c *Config) ValidateVirtualPointer() error {
 	if c.VirtualPointer.UI.FontSize > maxFontSize {
 		return derrors.Newf(derrors.CodeInvalidConfig,
 			"virtual_pointer.ui.font_size must be <= %d", maxFontSize)
+	}
+
+	switch c.VirtualPointer.UI.Shape {
+	case "", "circle", "crosshair", "dot", "custom":
+	default:
+		return derrors.New(
+			derrors.CodeInvalidConfig,
+			"virtual_pointer.ui.shape must be circle, crosshair, dot, or custom",
+		)
 	}
 
 	return nil
