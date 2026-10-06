@@ -70,7 +70,6 @@ const (
 	// grid bounds to center on selected cells.
 	FlagMaxDepthNudge Flag = "max-depth-nudge"
 
-
 	// FlagCursorSelectionMode chooses how the real cursor behaves during
 	// selection.
 	FlagCursorSelectionMode Flag = "cursor-selection-mode"
@@ -132,7 +131,6 @@ const (
 	usageZoomToDepth         = "Open recursive grid already zoomed to this depth at the cursor"
 	usageZoomAroundCursor    = "Auto-drill to the given depth (a non-negative integer) in recursive-grid with the subgrid centered around the current cursor position"
 	usageMaxDepthNudge       = "Keep recursive grid active at max depth and shift grid bounds to center on selected cells"
-
 )
 
 // usageCycle is what a comma-separated list means on the flags that cycle.

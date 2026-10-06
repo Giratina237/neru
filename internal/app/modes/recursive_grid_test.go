@@ -615,4 +615,3 @@ func TestApplyRecursiveGridFlags_MaxDepthNudge(t *testing.T) {
 		t.Error("expected MaxDepthNudge to be overridden to false")
 	}
 }
-

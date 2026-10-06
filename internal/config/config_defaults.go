@@ -224,7 +224,7 @@ const (
 	// cell. Equal to the font size it means "never shrink".
 	DefaultRecursiveGridMinFontSize = 6
 	// DefaultVirtualPointerChar is the default character displayed by the virtual pointer.
-	DefaultVirtualPointerChar = "\u25CF" // "●"
+	DefaultVirtualPointerChar  = "\u25CF" // "●"
 	DefaultVirtualPointerShape = ""
 	// DefaultVirtualPointerFontSize is the default font size for the virtual pointer char.
 	DefaultVirtualPointerFontSize = 32

@@ -26,7 +26,7 @@ var (
 	// VirtualPointerTextColorDark is the fallback dark text color for the virtual pointer char.
 	VirtualPointerFillColorLight = "#000000"
 	VirtualPointerFillColorDark  = "#ffffff"
-	VirtualPointerTextColorDark = solidRGBHex(defaultThemeDarkAccentAlt)
+	VirtualPointerTextColorDark  = solidRGBHex(defaultThemeDarkAccentAlt)
 
 	// HintsBackgroundColorLight is the fallback light background color for hints.
 	HintsBackgroundColorLight = applyAlpha(defaultThemeLightSurface, "F2")

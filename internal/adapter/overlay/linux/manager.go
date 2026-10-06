@@ -668,7 +668,7 @@ func (m *Manager) DrawRecursiveGrid(
 ) error {
 	virtualPointer.Visible = true
 	if virtualPointer.Position.X == 0 && virtualPointer.Position.Y == 0 {
-		virtualPointer.Position = image.Pt(bounds.Min.X + bounds.Dx()/2, bounds.Min.Y + bounds.Dy()/2)
+		virtualPointer.Position = image.Pt(bounds.Min.X+bounds.Dx()/2, bounds.Min.Y+bounds.Dy()/2)
 	}
 	return m.drawRegionGrid(
 		m.RecursiveGridOverlay(),
@@ -688,7 +688,7 @@ func (m *Manager) DrawBisect(
 ) error {
 	virtualPointer.Visible = true
 	if virtualPointer.Position.X == 0 && virtualPointer.Position.Y == 0 {
-		virtualPointer.Position = image.Pt(bounds.Min.X + bounds.Dx()/2, bounds.Min.Y + bounds.Dy()/2)
+		virtualPointer.Position = image.Pt(bounds.Min.X+bounds.Dx()/2, bounds.Min.Y+bounds.Dy()/2)
 	}
 	return m.drawRegionGrid(
 		m.BisectOverlay(),

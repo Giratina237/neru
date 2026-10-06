@@ -70,7 +70,6 @@ type Activation struct {
 	// MaxDepthNudge keeps recursive grid active at max depth, centering grid bounds on selected cells.
 	MaxDepthNudge *bool
 
-
 	// FilterRoles keeps only the elements with these accessibility roles.
 	FilterRoles []string
 
