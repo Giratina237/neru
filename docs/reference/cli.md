@@ -232,6 +232,12 @@ Takes a value. Modes: `recursive_grid`.
 
 Auto-drill to the given depth (a non-negative integer) in recursive-grid with the subgrid centered around the current cursor position.
 
+#### `--max-depth-nudge`
+
+Takes no value. Modes: `recursive_grid`.
+
+Keep recursive grid active at max depth and shift grid bounds to center on selected cells.
+
 #### `--cursor-selection-mode`
 
 Takes a value. Modes: `hints` · `grid` · `recursive_grid` · `bisect`.

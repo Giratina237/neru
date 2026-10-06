@@ -11,6 +11,7 @@ type baseContext struct {
 	onExit                []string
 	repeat                bool
 	cursorFollowSelection bool
+	maxDepthNudge         bool
 	selectedPoint         image.Point
 	hasSelection          bool
 	captureScope          string
@@ -74,6 +75,16 @@ func (c *baseContext) ToggleCursorFollowSelection() bool {
 	return c.cursorFollowSelection
 }
 
+// SetMaxDepthNudge sets whether live selection updates at max depth nudge the grid rather than completing.
+func (c *baseContext) SetMaxDepthNudge(nudge bool) {
+	c.maxDepthNudge = nudge
+}
+
+// MaxDepthNudge returns whether live selection updates at max depth nudge the grid rather than completing.
+func (c *baseContext) MaxDepthNudge() bool {
+	return c.maxDepthNudge
+}
+
 // SetSelectionPoint stores the active selection point for the mode.
 func (c *baseContext) SetSelectionPoint(point image.Point) {
 	c.selectedPoint = point
@@ -99,6 +110,7 @@ func (c *baseContext) Reset() {
 	c.repeat = false
 	c.cursorFollowSelection = false
 	c.captureScope = ""
+	c.maxDepthNudge = false
 	c.ClearSelectionPoint()
 }
 
