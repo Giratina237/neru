@@ -583,12 +583,13 @@ type RecursiveGridConfig struct {
 
 // VirtualPointerUI defines the visual settings for the character-based virtual pointer.
 type VirtualPointerUI struct {
-	Char       string `json:"char"       toml:"char"`
-	FontSize   int    `json:"fontSize"   toml:"font_size"`
-	FontFamily string `json:"fontFamily" toml:"font_family"`
-	TextColor  Color  `json:"textColor"  toml:"text_color"`
-	Shape      string `json:"shape"      toml:"shape"`
-	FillColor  Color  `json:"fillColor"  toml:"fill_color"`
+	Char           string `json:"char"           toml:"char"`
+	FontSize       int    `json:"fontSize"       toml:"font_size"`
+	FontFamily     string `json:"fontFamily"     toml:"font_family"`
+	TextColor      Color  `json:"textColor"      toml:"text_color"`
+	Shape          string `json:"shape"          toml:"shape"`
+	FillColor      Color  `json:"fillColor"      toml:"fill_color"`
+	BorderedCircle bool   `json:"borderedCircle" toml:"bordered_circle"`
 }
 
 // VirtualPointerConfig styles the standalone pointer drawn when the system

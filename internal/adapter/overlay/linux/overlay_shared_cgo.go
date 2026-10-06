@@ -1401,10 +1401,21 @@ func (o *sharedOverlay) drawRadialDualGridLines(
 
 //nolint:mnd,varnamelen
 func (o *sharedOverlay) drawVirtualPointer(vp recursivegridcomponent.VirtualPointerState) {
-	fillARGB := badge.ParseHexARGB(vp.FillColor)
 	halfSize := max(vp.Size/2, 1)
 	cx := vp.Position.X
 	cy := vp.Position.Y
+
+	if vp.BorderedCircle {
+		borderWidth := max(1.5, float64(halfSize)/2)
+		vpBounds := image.Rect(cx-halfSize, cy-halfSize, cx+halfSize, cy+halfSize)
+		fillARGB := badge.ParseHexARGB("#000000")
+		borderARGB := badge.ParseHexARGB("#ffffff")
+		o.drawRoundedRect(vpBounds, float64(halfSize), fillARGB, borderARGB, borderWidth)
+
+		return
+	}
+
+	fillARGB := badge.ParseHexARGB(vp.FillColor)
 
 	switch vp.Shape {
 	case "circle":

@@ -47,11 +47,12 @@ type SearchInputLayout struct {
 // VirtualPointerStyle is the resolved appearance of the virtual pointer drawn
 // inside the grid and recursive-grid frames.
 type VirtualPointerStyle struct {
-	FontSize   int
-	FillColor  string
-	Char       string
-	FontFamily string
-	Shape      string
+	FontSize       int
+	FillColor      string
+	Char           string
+	FontFamily     string
+	Shape          string
+	BorderedCircle bool
 }
 
 // StyleSource is what a caller that needs a resolved Style depends on. It is
@@ -239,11 +240,12 @@ func (r *StyleResolver) push(cfg *config.Config, style Style) {
 // rather than each deciding which of them a backend gets.
 func pointerAppearance(style VirtualPointerStyle) PointerAppearance {
 	return PointerAppearance{
-		FillColor:  style.FillColor,
-		FontFamily: style.FontFamily,
-		Char:       style.Char,
-		FontSize:   style.FontSize,
-		Shape:      style.Shape,
+		FillColor:      style.FillColor,
+		FontFamily:     style.FontFamily,
+		Char:           style.Char,
+		FontSize:       style.FontSize,
+		Shape:          style.Shape,
+		BorderedCircle: style.BorderedCircle,
 	}
 }
 
@@ -280,8 +282,9 @@ func buildVirtualPointerStyle(
 		// Through the shared resolver, like every other overlay's family: a
 		// generic alias reaches the platform as a family it can actually find
 		// rather than as a name nothing is installed under (#1305).
-		FontFamily: ports.ResolveFont(cfg.UI.FontFamily),
-		Shape:      cfg.UI.Shape,
+		FontFamily:     ports.ResolveFont(cfg.UI.FontFamily),
+		Shape:          cfg.UI.Shape,
+		BorderedCircle: cfg.UI.BorderedCircle,
 	}
 }
 

@@ -495,6 +495,22 @@ func (o *winOverlay) drawGridPointer(pointer recursivegridcomponent.VirtualPoint
 		return
 	}
 
+	if pointer.BorderedCircle {
+		halfSize := max(pointer.Size/2, 1)
+		borderWidth := max(1.5, float64(halfSize)/2)
+		bounds := image.Rect(
+			pointer.Position.X-halfSize,
+			pointer.Position.Y-halfSize,
+			pointer.Position.X+halfSize,
+			pointer.Position.Y+halfSize,
+		)
+		fillARGB := badge.ParseHexARGB("#000000")
+		borderARGB := badge.ParseHexARGB("#ffffff")
+		o.drawFilledRect(bounds, fillARGB, borderARGB, borderWidth*o.scale(), float64(halfSize))
+
+		return
+	}
+
 	o.window.DrawPointerGlyph(
 		pointer.Position,
 		scaledInt(pointer.Size, o.scale()),

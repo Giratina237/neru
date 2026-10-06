@@ -99,7 +99,10 @@ func (s *recordingSurface) syncBeforeAnimation() {}
 
 func (s *recordingSurface) rectPrim(bounds image.Rectangle, fill, border uint32, lineWidth float64) {
 	s.rects = append(s.rects, recordedRect{
-		bounds: bounds, fill: fill, border: border, lineWidth: lineWidth,
+		bounds:    bounds,
+		fill:      fill,
+		border:    border,
+		lineWidth: lineWidth,
 	})
 }
 
@@ -107,7 +110,12 @@ func (s *recordingSurface) roundedRectPrim(
 	bounds image.Rectangle, radius float64, fill, border uint32, lineWidth float64,
 ) {
 	s.rects = append(s.rects, recordedRect{
-		bounds: bounds, radius: radius, fill: fill, border: border, lineWidth: lineWidth, rounded: true,
+		bounds:    bounds,
+		radius:    radius,
+		fill:      fill,
+		border:    border,
+		lineWidth: lineWidth,
+		rounded:   true,
 	})
 }
 
