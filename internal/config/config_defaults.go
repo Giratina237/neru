@@ -220,8 +220,9 @@ const (
 	// cell. Equal to the font size it means "never shrink".
 	DefaultRecursiveGridMinFontSize = 6
 	// DefaultVirtualPointerChar is the default character displayed by the virtual pointer.
-	DefaultVirtualPointerChar = "\u25CF" // "●"
-	DefaultVirtualPointerShape = ""
+	DefaultVirtualPointerChar           = "\u25CF" // "●"
+	DefaultVirtualPointerShape          = ""
+	DefaultVirtualPointerBorderedCircle = false
 	// DefaultVirtualPointerFontSize is the default font size for the virtual pointer char.
 	DefaultVirtualPointerFontSize = 32
 	// DefaultVirtualPointerFontFamily is the default font family for the virtual pointer char.
@@ -636,12 +637,13 @@ func defaultBisect() BisectConfig {
 func defaultVirtualPointer() VirtualPointerConfig {
 	return VirtualPointerConfig{
 		UI: VirtualPointerUI{
-			Char:       DefaultVirtualPointerChar,
-			FontSize:   DefaultVirtualPointerFontSize,
-			FontFamily: DefaultVirtualPointerFontFamily,
-			TextColor:  Color{},
-			FillColor:  Color{},
-			Shape:      DefaultVirtualPointerShape,
+			Char:           DefaultVirtualPointerChar,
+			FontSize:       DefaultVirtualPointerFontSize,
+			FontFamily:     DefaultVirtualPointerFontFamily,
+			TextColor:      Color{},
+			FillColor:      Color{},
+			Shape:          DefaultVirtualPointerShape,
+			BorderedCircle: DefaultVirtualPointerBorderedCircle,
 		},
 	}
 }

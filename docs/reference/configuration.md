@@ -883,10 +883,13 @@ font_size = 12
 
 | Option        | Type   | Default | Description                                                                                                                |
 | ------------- | ------ | ------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `char`        | string | `"●"`   | Character to display                                                                                                       |
-| `font_size`   | int    | `8`     | Font size in points                                                                                                        |
-| `font_family` | string | `""`    | Font family. Accepts [generic aliases](#fonts), and empty means the platform's sans family |
-| `text_color`  | color  | derived | Character color                                                                                                            |
+| `char`            | string | `"●"`   | Character to display                                                                        |
+| `font_size`       | int    | `8`     | Font size in points                                                                         |
+| `font_family`     | string | `""`    | Font family. Accepts [generic aliases](#fonts), and empty means the platform's sans family  |
+| `text_color`      | color  | derived | Character color                                                                             |
+| `shape`           | string | `""`    | Shape override: `"circle"`, `"crosshair"`, `"dot"`, or `"custom"`                           |
+| `fill_color`      | color  | derived | Fill/background color of the pointer; empty uses `text_color`                               |
+| `bordered_circle` | bool   | `false` | Render a black circle with white border, overriding `char`                                  |
 
 ## [mouse_action_indicator]
 

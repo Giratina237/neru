@@ -238,4 +238,22 @@ func TestConfigValidateVirtualPointer(t *testing.T) {
 		minValid: 0,
 		maxValid: math.MaxInt32,
 	}})
+
+	t.Run("bordered circle allows empty char", func(t *testing.T) {
+		cfg := validBase(t)
+		cfg.VirtualPointer.UI.BorderedCircle = true
+		cfg.VirtualPointer.UI.Char = ""
+
+		if err := cfg.ValidateVirtualPointer(); err != nil {
+			t.Errorf("ValidateVirtualPointer() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("bordered circle rejects multi-char", func(t *testing.T) {
+		cfg := validBase(t)
+		cfg.VirtualPointer.UI.BorderedCircle = true
+		cfg.VirtualPointer.UI.Char = "ab"
+
+		assertRejected(t, cfg.ValidateVirtualPointer(), "virtual_pointer.ui.char", "ab")
+	})
 }

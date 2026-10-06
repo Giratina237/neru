@@ -732,13 +732,14 @@ func (m *Manager) DrawGridPointer(
 	}
 
 	m.dispatchGridPointer(recursivegrid.VirtualPointerState{
-		Visible:   true,
-		Position:  point,
-		Size:      appearance.FontSize,
-		FillColor: appearance.FillColor,
-		Char:      appearance.Char,
-		FontName:  appearance.FontFamily,
-		Shape:     appearance.Shape,
+		Visible:        true,
+		Position:       point,
+		Size:           appearance.FontSize,
+		FillColor:      appearance.FillColor,
+		Char:           appearance.Char,
+		FontName:       appearance.FontFamily,
+		Shape:          appearance.Shape,
+		BorderedCircle: appearance.BorderedCircle,
 	})
 }
 

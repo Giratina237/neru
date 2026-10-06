@@ -351,3 +351,84 @@ func TestLinuxOverlayManager_Clear_ForgetsThePointerItWasDrawing(t *testing.T) {
 		)
 	}
 }
+
+// TestLinuxOverlayManager_DrawGridPointer_BorderedCircleRendersCircleWithBorder
+// pins that when BorderedCircle is true, a black circle with white border is
+// drawn instead of the character glyph.
+func TestLinuxOverlayManager_DrawGridPointer_BorderedCircleRendersCircleWithBorder(t *testing.T) {
+	t.Parallel()
+
+	overlayManager, surface := gridOnSurface(t)
+
+	appearance := gridPointerAppearance
+	appearance.BorderedCircle = true
+
+	overlayManager.DrawGridPointer(
+		manager.ModeGrid,
+		image.Pt(120, 240),
+		appearance,
+	)
+
+	if surface.paintedText(appearance.Char) {
+		t.Errorf("painted text %q, want bordered circle instead", appearance.Char)
+	}
+
+	halfSize := appearance.FontSize / 2
+	expectedBounds := image.Rect(120-halfSize, 240-halfSize, 120+halfSize, 240+halfSize)
+	expectedBorderWidth := max(1.5, float64(halfSize)/2)
+	found := false
+	for _, r := range surface.rects {
+		if r.rounded && r.bounds == expectedBounds && r.fill == 0xFF000000 &&
+			r.border == 0xFFFFFFFF &&
+			r.lineWidth == expectedBorderWidth {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("did not find expected bordered circle in recorded rects: %+v", surface.rects)
+	}
+}
+
+// TestLinuxOverlayManager_DrawGridPointer_BorderedCircleScalesBorderWithCircleSize
+// pins that the border width scales proportionally with circle size.
+func TestLinuxOverlayManager_DrawGridPointer_BorderedCircleScalesBorderWithCircleSize(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		size      int
+		wantWidth float64
+	}{
+		{size: 8, wantWidth: 2.0},
+		{size: 32, wantWidth: 8.0},
+		{size: 64, wantWidth: 16.0},
+	} {
+		t.Run("size", func(t *testing.T) {
+			overlayManager, surface := gridOnSurface(t)
+
+			appearance := gridPointerAppearance
+			appearance.BorderedCircle = true
+			appearance.FontSize = tc.size
+
+			overlayManager.DrawGridPointer(
+				manager.ModeGrid,
+				image.Pt(100, 100),
+				appearance,
+			)
+
+			halfSize := tc.size / 2
+			expectedBounds := image.Rect(100-halfSize, 100-halfSize, 100+halfSize, 100+halfSize)
+			found := false
+			for _, r := range surface.rects {
+				if r.rounded && r.bounds == expectedBounds && r.lineWidth == tc.wantWidth {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("size %d: did not find rect with bounds %v and lineWidth %v: %+v",
+					tc.size, expectedBounds, tc.wantWidth, surface.rects)
+			}
+		})
+	}
+}
