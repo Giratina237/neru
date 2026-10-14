@@ -182,6 +182,26 @@ sudo_for() {
     if [ -w "$d" ]; then printf ''; else printf 'sudo'; fi
 }
 
+# stop_daemon -> quits this user's running Neru processes and waits for them
+# to exit. `neru stop` only pauses Neru, so the old daemon would keep the
+# socket and the next `neru launch` would report it as already running. The
+# daemon shuts down cleanly on SIGTERM. pkill matches the exact process name.
+# A command-line pattern with -f matched unrelated processes on macOS. It
+# warns and returns non-zero when Neru may still be running.
+stop_daemon() {
+    if ! command -v pkill >/dev/null 2>&1; then
+        warn "Cannot quit a running Neru without pkill. Quit it from the menu bar."
+        return 1
+    fi
+    pkill -TERM -x -u "$(id -u)" neru 2>/dev/null || return 0
+    for _ in $(seq 1 100); do
+        pgrep -x -u "$(id -u)" neru >/dev/null 2>&1 || return 0
+        sleep 0.1
+    done
+    warn "Neru has not quit after 10s. Quit it from the menu bar."
+    return 1
+}
+
 # Runs curl with a progress bar on a terminal and quietly otherwise.
 fetch() {
     if [ -t 2 ]; then
@@ -515,7 +535,7 @@ if [ "$uninstall" = 1 ]; then
                 if "$neru_bin" services uninstall >/dev/null 2>&1; then ok "Login service removed"; fi
                 ;;
         esac
-        "$neru_bin" stop >/dev/null 2>&1 || true
+        stop_daemon || true
     fi
     if remove_legacy_unit; then ok "Removed the systemd unit the previous installer wrote"; fi
     if [ "$os" = darwin ]; then
@@ -676,8 +696,7 @@ elif [ -x "$neru_bin" ]; then
     esac
     if "$neru_bin" status >/dev/null 2>&1; then
         daemon_was_running=1
-        "$neru_bin" stop >/dev/null 2>&1 || true
-        info "Stopped the running daemon"
+        if stop_daemon; then info "Stopped the running daemon"; fi
     fi
 fi
 
