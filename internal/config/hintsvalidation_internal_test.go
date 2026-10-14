@@ -248,7 +248,13 @@ func hintsCases() []hintsCase {
 		{
 			name:      "bad strategy",
 			breakIt:   func(c *Config) { c.Hints.Strategy = "telepathy" },
-			message:   "[INVALID_CONFIG] hints.strategy must be \"axtree\", \"vision\", or \"contour\"",
+			message:   "[INVALID_CONFIG] hints.strategy must be \"axtree\", \"vision\", \"contour\", or \"segment\"",
+			placement: HintPlacementBottom,
+		},
+		{
+			name:      "bad segment targets",
+			breakIt:   func(c *Config) { c.Hints.Segment.Targets = "sentences" },
+			message:   "[INVALID_CONFIG] hints.segment.targets must be \"words\", \"phrases\", or \"controls\"",
 			placement: HintPlacementBottom,
 		},
 		{
@@ -306,7 +312,7 @@ func hintsCases() []hintsCase {
 				c.Hints.Strategy = "telepathy"
 				c.Hints.LabelDirection = placementSideways
 			},
-			message:   "[INVALID_CONFIG] hints.strategy must be \"axtree\", \"vision\", or \"contour\"",
+			message:   "[INVALID_CONFIG] hints.strategy must be \"axtree\", \"vision\", \"contour\", or \"segment\"",
 			placement: HintPlacementBottom,
 		},
 	}

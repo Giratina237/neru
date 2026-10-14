@@ -25,11 +25,13 @@ type MockVisionPort struct {
 	) ([]*element.Element, error)
 	CaptureScreenFunc  func(context.Context) (*image.RGBA, error)
 	DetectContoursFunc func(context.Context, image.Rectangle, config.HintsContourConfig) ([]*element.Element, error)
+	DetectSegmentsFunc func(context.Context, image.Rectangle, config.HintsSegmentConfig) ([]*element.Element, error)
 
 	mu       sync.Mutex
 	detectN  int
 	captureN int
 	contourN int
+	segmentN int
 }
 
 // Health implements ports.VisionPort.
@@ -92,6 +94,26 @@ func (m *MockVisionPort) DetectContours(
 	)
 }
 
+// DetectSegments implements ports.VisionPort.
+func (m *MockVisionPort) DetectSegments(
+	ctx context.Context,
+	screenBounds image.Rectangle,
+	cfg config.HintsSegmentConfig,
+) ([]*element.Element, error) {
+	m.mu.Lock()
+	m.segmentN++
+	m.mu.Unlock()
+
+	if m.DetectSegmentsFunc != nil {
+		return m.DetectSegmentsFunc(ctx, screenBounds, cfg)
+	}
+
+	return nil, derrors.New(
+		derrors.CodeNotSupported,
+		"segment detection is not supported by this mock",
+	)
+}
+
 // DetectCallCount reports how many times DetectElements was called.
 func (m *MockVisionPort) DetectCallCount() int {
 	m.mu.Lock()
@@ -114,6 +136,14 @@ func (m *MockVisionPort) DetectContoursCallCount() int {
 	defer m.mu.Unlock()
 
 	return m.contourN
+}
+
+// DetectSegmentsCallCount reports how many times DetectSegments was called.
+func (m *MockVisionPort) DetectSegmentsCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.segmentN
 }
 
 // Ensure MockVisionPort implements ports.VisionPort.

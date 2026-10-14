@@ -109,6 +109,24 @@ const (
 	// StrategyContour detects interactive targets from the screen image by
 	// edge and contour analysis, an algorithm ported from wl-kbptr.
 	StrategyContour = "contour"
+
+	// StrategySegment detects targets from the screen image by segmenting it
+	// into controls, pictures and text labels, with no recognition step.
+	StrategySegment = "segment"
+)
+
+// What the segment strategy hints, the values hints.segment.targets accepts.
+const (
+	// SegmentTargetsWords hints every word, so every link is reachable. This
+	// is the default.
+	SegmentTargetsWords = "words"
+
+	// SegmentTargetsPhrases joins words of one color into phrases. Dense
+	// text gets fewer hints, but adjacent links of one color share a hint.
+	SegmentTargetsPhrases = "phrases"
+
+	// SegmentTargetsControls hints controls, icons and pictures, and no text.
+	SegmentTargetsControls = "controls"
 )
 
 // Hint label enumeration orders, the values hints.label_direction accepts.
