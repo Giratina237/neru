@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -2601,6 +2602,58 @@ func TestSimulation_MonitorMoveCarriesCaptureHintsToTheNewDisplay(t *testing.T) 
 
 	if got := sim.app.CurrentMode(); got != domain.ModeHints {
 		t.Fatalf("mode after the monitor move = %v, want hints", got)
+	}
+}
+
+// TestSimulation_MissionControlDetectionFollowsAReload covers
+// hints.detect_mission_control changing on reload and on `config set`. It used
+// to be armed once at startup, so switching it on or off took a daemon restart.
+// The test checks both readers: the watcher, which reports Mission Control
+// opening, and the accessibility port, which aims hints at it.
+func TestSimulation_MissionControlDetectionFollowsAReload(t *testing.T) {
+	sim := newSimHarness(t, simConfig(), threeButtons(t))
+
+	for _, detect := range []bool{true, false} {
+		configPath := filepath.Join(t.TempDir(), "config.toml")
+
+		writeErr := os.WriteFile(configPath, fmt.Appendf(nil, `
+[hints]
+include_dock_hints = true
+detect_mission_control = %t
+
+[hotkeys]
+%q = "hints"
+`, detect, hintsHotkey), 0o600)
+		if writeErr != nil {
+			t.Fatalf("failed to write the reloaded config: %v", writeErr)
+		}
+
+		reloadErr := sim.app.ReloadConfig(context.Background(), configPath)
+		if reloadErr != nil {
+			t.Fatalf("ReloadConfig() error = %v", reloadErr)
+		}
+
+		assertMissionControlDetection(t, sim, detect, "reloading")
+
+		setErr := sim.app.SetConfigField(context.Background(),
+			"hints.detect_mission_control", strconv.FormatBool(!detect))
+		if setErr != nil {
+			t.Fatalf("SetConfigField() error = %v", setErr)
+		}
+
+		assertMissionControlDetection(t, sim, !detect, "setting")
+	}
+}
+
+func assertMissionControlDetection(t *testing.T, sim *simHarness, want bool, how string) {
+	t.Helper()
+
+	if got := sim.watcher.MCDetectionEnabled(); got != want {
+		t.Errorf("watcher detection after %s detect_mission_control = %t is %t", how, want, got)
+	}
+
+	if got := sim.ax.missionControlDetection(); got != want {
+		t.Errorf("hint scan detection after %s detect_mission_control = %t is %t", how, want, got)
 	}
 }
 
